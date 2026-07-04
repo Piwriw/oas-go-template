@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen build run run-client test lint fmt audit docker dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen build run run-client test lint fmt audit docker web-docker dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -49,6 +49,9 @@ docker:  ## Build server docker image (override GOPROXY via env if behind restri
 	  -f build/Dockerfile \
 	  $(if $(GOPROXY),--build-arg GOPROXY=$(GOPROXY)) \
 	  -t oas-go-template:latest .
+
+web-docker:  ## Build frontend docker image (multi-stage: node build → nginx serve)
+	docker build -f web/Dockerfile -t oas-go-template-web:latest web/
 
 dev:  ## Run server with live reload (requires air: go install github.com/air-verse/air@latest)
 	air
