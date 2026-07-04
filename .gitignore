@@ -38,6 +38,7 @@ web/.vite/
 
 # Air live-reload tmp
 /tmp/
+docs/superpowers
 
 # OS
 Thumbs.db
