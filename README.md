@@ -14,7 +14,7 @@ server stubs and client SDK from a single source of truth: `spec/openapi.yaml`.
 
 ## Project Layout
 
-See `docs/superpowers/specs/2026-07-04-project-init-design.md`.
+See `docs/superpowers/specs/2026-07-04-project-init-design.md` (removed from tracking in this template; see git history if needed) and `SKILL.md` for how to derive a new project from this one.
 
 ## Quickstart
 
