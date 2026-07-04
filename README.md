@@ -53,8 +53,8 @@ can verify traces end-to-end without any cloud account.
 make dev-stack                                       # start collector + Jaeger
 ./bin/server                                         # reads config.yaml (otel.exporter_otlp_endpoint → collector)
 # in another shell, generate some traffic:
-curl -sf http://localhost:8080/healthz
-curl -sf http://localhost:8080/version
+curl -sf http://localhost:8000/healthz
+curl -sf http://localhost:8000/version
 # open Jaeger UI:
 open http://localhost:16686                          # search Service = oas-go-template
 make dev-stack-down                                  # stop when done

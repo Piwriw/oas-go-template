@@ -5,7 +5,7 @@
 # internal/config/config.go for the env-name list (look for `env:"..."` tags).
 
 server:
-  http_addr: ":8080"          # env: HTTP_ADDR
+  http_addr: ":8000"          # env: HTTP_ADDR
   gin_mode: debug            # env: GIN_MODE  (debug | release | test)
 
 db:

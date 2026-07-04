@@ -72,7 +72,7 @@ func Load(path string) (*Config, error) {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			HTTPAddr: ":8080",
+			HTTPAddr: ":8000",
 			GinMode:  "debug",
 		},
 		DB: db.Config{

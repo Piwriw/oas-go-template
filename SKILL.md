@@ -162,8 +162,8 @@ make build    # binaries land in bin/
 make test
 make lint     # golangci-lint, excludes *.gen.go
 make docker GOPROXY=https://goproxy.cn,direct   # remove GOPROXY if not behind GFW
-docker run --rm -d -p 18080:8080 --name smoke oas-go-template:latest  # rename tag in Makefile if you care
-curl -sf http://localhost:18080/<your-first-endpoint>
+docker run --rm -d -p 18000:8000 --name smoke oas-go-template:latest  # rename tag in Makefile if you care
+curl -sf http://localhost:18000/<your-first-endpoint>
 docker stop smoke
 ```
 
@@ -193,7 +193,7 @@ The template ships a `docker-compose.yml` (Jaeger + otel-collector) so you can
 cp config.example.yaml config.yaml   # make sure otel.exporter_otlp_endpoint = http://localhost:4318
 make dev-stack                        # start Jaeger + collector
 ./bin/server                          # or: make run
-curl -sf http://localhost:8080/healthz                      # generate a request
+curl -sf http://localhost:8000/healthz                      # generate a request
 # Jaeger UI: http://localhost:16686 → Service = <serviceName>
 make dev-stack-down                                         # stop when done
 ```
@@ -318,12 +318,12 @@ v1 uses `linters.enable: [...]`. v2 uses `linters.default: standard` + `linters.
 
 ### 7. Stale server process makes you think ldflags didn't work
 
-`go run ./cmd/server` leaves a cached binary in `$GOCACHE` that may keep running after you Ctrl-C. When you then `curl /version` and see `dev/unknown/unknown` despite correct ldflags, the old process is still bound to :8080.
+`go run ./cmd/server` leaves a cached binary in `$GOCACHE` that may keep running after you Ctrl-C. When you then `curl /version` and see `dev/unknown/unknown` despite correct ldflags, the old process is still bound to :8000.
 
 Before debugging ldflags, run:
 
 ```bash
-lsof -ti:8080 | xargs -r kill -9
+lsof -ti:8000 | xargs -r kill -9
 ```
 
 ### 8. Docker build fails on `go mod download` behind GFW

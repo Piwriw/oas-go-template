@@ -21,7 +21,7 @@ func main() {
 func run() error {
 	serverURL := os.Getenv("SERVER_URL")
 	if serverURL == "" {
-		serverURL = "http://localhost:8080"
+		serverURL = "http://localhost:8000"
 	}
 
 	cw, err := api.NewClientWithResponses(serverURL)

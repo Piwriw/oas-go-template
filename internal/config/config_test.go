@@ -72,8 +72,8 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing file should fall back to defaults, got: %v", err)
 	}
-	if cfg.Server.HTTPAddr != ":8080" {
-		t.Errorf("default HTTPAddr = %q, want :8080", cfg.Server.HTTPAddr)
+	if cfg.Server.HTTPAddr != ":8000" {
+		t.Errorf("default HTTPAddr = %q, want :8000", cfg.Server.HTTPAddr)
 	}
 	if !cfg.OTel.Enabled {
 		t.Errorf("default OTel.Enabled should be true")
@@ -95,8 +95,8 @@ func TestLoad_defaultPathMissingOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load default config.yaml in empty dir: %v", err)
 	}
-	if cfg.Server.HTTPAddr != ":8080" {
-		t.Errorf("default HTTPAddr = %q, want :8080", cfg.Server.HTTPAddr)
+	if cfg.Server.HTTPAddr != ":8000" {
+		t.Errorf("default HTTPAddr = %q, want :8000", cfg.Server.HTTPAddr)
 	}
 	if cfg.Server.GinMode != "debug" {
 		t.Errorf("default GinMode = %q", cfg.Server.GinMode)
