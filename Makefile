@@ -24,8 +24,8 @@ test:  ## Run all tests
 lint:  ## Run golangci-lint
 	golangci-lint run
 
-docker:  ## Build server docker image
-	docker build -f build/Dockerfile -t oas-go-template:latest .
+docker:  ## Build server docker image (override GOPROXY via env if behind restricted network)
+	docker build -f build/Dockerfile $(if $(GOPROXY),--build-arg GOPROXY=$(GOPROXY)) -t oas-go-template:latest .
 
 dev:  ## Run server with live reload (requires air: go install github.com/air-verse/air@latest)
 	air
