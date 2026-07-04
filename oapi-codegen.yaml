@@ -1,21 +1,7 @@
-# Base output package name (overridden per-invocation in scripts/gen.sh)
+# oapi-codegen base configuration.
+# scripts/gen.sh invokes oapi-codegen multiple times, supplying -generate and -o
+# flags per output. We keep this file for shared options only (package, output-options).
 package: api
-
-# Generate: models, gin server (strict), and client.
-# Each invocation in scripts/gen.sh picks the right combination.
-generate:
-  - models
-  - gin-server
-  - strict-server
-  - client
-
-# Compatibility settings
-compatibility:
-  apply-chi-middleware-first-to-last: false
-
-output:
-  # Default output (overridden by -o flag at runtime)
-  out: internal/api/server.gen.go
 
 output-options:
   skip-prune: false
