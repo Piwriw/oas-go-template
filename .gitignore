@@ -1,0 +1,43 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test / build artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Generated Go code (kept tracked, but in case we add anything transient)
+# Note: *.gen.go files ARE tracked; do not ignore them.
+
+# Dependency directories
+/vendor/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Node (web/)
+node_modules/
+web/dist/
+web/.vite/
+
+# Air live-reload tmp
+/tmp/
+
+# OS
+Thumbs.db
