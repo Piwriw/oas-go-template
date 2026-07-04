@@ -7,7 +7,7 @@ import (
 )
 
 // GetHealth implements api.StrictServerInterface.GetHealth.
-func (h *Handler) GetHealth(ctx context.Context, request api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
+func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
 	version := "0.1.0"
 	return api.GetHealth200JSONResponse(api.Health{
 		Status:  "ok",

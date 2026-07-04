@@ -1,3 +1,4 @@
+// Package main is the server entrypoint: load config, wire gin + handler, serve HTTP.
 package main
 
 import (
