@@ -52,4 +52,3 @@ func run() error {
 		return fmt.Errorf("unexpected response (HTTP %d, body=%q): %w", resp.StatusCode(), string(resp.Body), errors.New("non-2xx"))
 	}
 }
-
