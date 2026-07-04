@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen build run run-client test lint fmt docker dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen build run run-client test lint fmt audit docker dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -36,6 +36,10 @@ lint:  ## Run golangci-lint
 
 fmt:  ## Format Go code with goimports (gofmt + import grouping)
 	goimports -local github.com/piwriw/oas-go-template -w .
+
+audit:  ## Scan dependencies (govulncheck) and source (gosec) for security issues
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	go run github.com/securego/gosec/v2/cmd/gosec@latest -quiet ./...
 
 docker:  ## Build server docker image (override GOPROXY via env if behind restricted network)
 	docker build \
