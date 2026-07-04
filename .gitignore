@@ -31,6 +31,9 @@ coverage.html
 .env.local
 .env.*.local
 
+# Local config (real values, often with secrets; commit only config.example.yaml)
+/config.yaml
+
 # Node (web/)
 node_modules/
 web/dist/
