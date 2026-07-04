@@ -1,0 +1,10 @@
+# Patterns to ignore when packaging the chart.
+.idea/
+.vscode/
+*.swp
+*.bak
+*.tmp
+.DS_Store
+README.md.gtpl
+/values.*.yaml
+/values.override.yaml

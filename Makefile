@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen build run run-client test lint fmt audit docker web-docker dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -52,6 +52,12 @@ docker:  ## Build server docker image (override GOPROXY via env if behind restri
 
 web-docker:  ## Build frontend docker image (multi-stage: node build → nginx serve)
 	docker build -f web/Dockerfile -t oas-go-template-web:latest web/
+
+helm-lint:  ## Lint the Helm chart (requires helm 3)
+	helm lint chart/
+
+helm-template:  ## Render chart templates locally for inspection (no cluster needed)
+	helm template oas-go-template chart/ | less
 
 dev:  ## Run server with live reload (requires air: go install github.com/air-verse/air@latest)
 	air

@@ -1,0 +1,39 @@
+oas-go-template chart deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+================================================================
+  Services
+================================================================
+Backend  : {{ include "oas-go-template.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.service.port }}
+{{- if .Values.web.enabled }}
+Frontend : {{ include "oas-go-template.fullname" . }}-web.{{ .Release.Namespace }}.svc:{{ .Values.web.service.port }}
+{{- end }}
+
+================================================================
+  Quick smoke test (port-forward)
+================================================================
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "oas-go-template.fullname" . }}-server {{ .Values.server.service.port }}:{{ .Values.server.service.port }}
+  curl http://localhost:{{ .Values.server.service.port }}/healthz
+  curl http://localhost:{{ .Values.server.service.port }}/version
+
+{{- if .Values.web.enabled }}
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "oas-go-template.fullname" . }}-web {{ .Values.web.service.port }}:{{ .Values.web.service.port }}
+  open http://localhost:{{ .Values.web.service.port }}
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+================================================================
+  Ingress
+================================================================
+{{- range .Values.ingress.hosts }}
+  Host : {{ .host }}
+{{- range .paths }}
+  - {{ .path }} → {{ .service }}:{{ .port }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if eq .Values.server.config "" }}
+NOTE: server.config is empty — the pod boots with built-in defaults (debug
+mode, OTel disabled). Override via `helm upgrade -f values.<env>.yaml`.
+{{- end }}

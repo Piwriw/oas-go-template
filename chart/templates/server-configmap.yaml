@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oas-go-template.fullname" . }}-server
+  labels:
+    {{- include "oas-go-template.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+data:
+  # server reads this via -c /app/config.yaml (see server-deployment.yaml args).
+  config.yaml: |
+    {{- .Values.server.config | nindent 4 }}

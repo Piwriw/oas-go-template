@@ -1,0 +1,14 @@
+apiVersion: v2
+name: oas-go-template
+description: A Helm chart for oas-go-template (gin server + React frontend)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - go
+  - gin
+  - openapi
+  - react
+  - template
+maintainers:
+  - name: piwriw
