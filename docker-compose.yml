@@ -5,6 +5,14 @@ services:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "16686:16686"   # Jaeger UI
+    healthcheck:
+      # Jaeger exposes / on the collector port; a 200 means the OTLP receiver
+      # is up and the all-in-one is ready to accept spans.
+      test: ["CMD", "wget", "-qO-", "http://localhost:14269/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -15,4 +23,5 @@ services:
       - "4317:4317"     # OTLP gRPC
       - "4318:4318"     # OTLP HTTP (what our server uses)
     depends_on:
-      - jaeger
+      jaeger:
+        condition: service_healthy

@@ -16,7 +16,8 @@ exporters:
     endpoint: jaeger:4317
     tls:
       insecure: true
-  # Local visibility — collector logs a summary of received spans to its stdout.
+  # Local visibility — collector logs received spans to its stdout.
+  # Switch verbosity to "detailed" to see span attributes too (noisy).
   debug:
     verbosity: basic
 

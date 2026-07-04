@@ -5,10 +5,10 @@
 // OTel span (e.g. inside an otelgin-instrumented HTTP request), and request_id when
 // emitted through the gin middleware.
 //
-// Configuration via env:
+// LogConfig is loaded from config.yaml by internal/config:
 //
-//	LOG_FORMAT = text | json   (default: text)
-//	LOG_LEVEL  = debug | info | warn | error   (default: info)
+//	format = text | json   (default: text)
+//	level  = debug | info | warn | error   (default: info)
 package logging
 
 import (
@@ -24,12 +24,18 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// New returns the base *slog.Logger writing to stderr. Replace slog.SetDefault
-// with the returned logger so libraries that use slog.Default() also pick it up.
-func New() *slog.Logger {
-	opts := &slog.HandlerOptions{Level: parseLevel(os.Getenv("LOG_LEVEL"))}
+// LogConfig drives slog setup. Loaded by internal/config.
+type LogConfig struct {
+	Format string `mapstructure:"format"`
+	Level  string `mapstructure:"level"`
+}
+
+// New returns the base *slog.Logger writing to stderr. Pass the LogConfig from
+// the central config so defaults have already been applied.
+func New(cfg LogConfig) *slog.Logger {
+	opts := &slog.HandlerOptions{Level: parseLevel(cfg.Level)}
 	var inner slog.Handler
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("LOG_FORMAT")), "json") {
+	if strings.EqualFold(strings.TrimSpace(cfg.Format), "json") {
 		inner = slog.NewJSONHandler(os.Stderr, opts)
 	} else {
 		inner = slog.NewTextHandler(os.Stderr, opts)
@@ -40,7 +46,12 @@ func New() *slog.Logger {
 // Middleware generates (or accepts) a request_id per request, stores it in the gin
 // context, mirrors it back via X-Request-ID response header, and writes one structured
 // log line per request. The base logger is the project-wide slog.Default().
+//
+// Note: slog.Default() is captured once per middleware build so request hot path
+// does one With() rather than two Default() lookups (Default() walks an atomic
+// each call).
 func Middleware() gin.HandlerFunc {
+	base := slog.Default()
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -53,7 +64,7 @@ func Middleware() gin.HandlerFunc {
 
 		// Attach request_id to the logger so subsequent InfoContext calls in handlers
 		// pick it up automatically.
-		logger := slog.Default().With(slog.String("request_id", reqID))
+		logger := base.With(slog.String("request_id", reqID))
 		c.Set(loggerKey, logger)
 
 		c.Next()

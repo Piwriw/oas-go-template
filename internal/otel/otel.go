@@ -1,16 +1,15 @@
 // Package otel initializes the OpenTelemetry SDK with OTLP HTTP exporters.
 //
-// Init reads standard OTEL_* environment variables (e.g. OTEL_EXPORTER_OTLP_ENDPOINT,
-// OTEL_SDK_DISABLED). When Init returns (nil, nil), OTel is disabled and the caller
-// may skip shutdown.
+// Config is loaded from config.yaml by internal/config. When Enabled is false,
+// Init returns (nil, nil) and the caller may skip shutdown.
 package otel
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
+	"net/url"
 	"strings"
 
 	"go.opentelemetry.io/otel"
@@ -23,13 +22,40 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 )
 
+// Config drives OTel SDK setup. Loaded by internal/config.
+type Config struct {
+	// Enabled=false skips SDK init entirely (no exporters, no providers).
+	Enabled bool `mapstructure:"enabled"`
+
+	// ExporterOTLPEndpoint is the OTLP HTTP endpoint (e.g. http://localhost:4318).
+	// Parsed into host+scheme and forwarded to the OTLP HTTP exporters.
+	ExporterOTLPEndpoint string `mapstructure:"exporter_otlp_endpoint"`
+
+	// ServiceName defaults to the value passed by the caller (usually main);
+	// set this only if you want to override at the config layer.
+	ServiceName string `mapstructure:"service_name"`
+
+	// ServiceVersion defaults to the value passed by the caller.
+	ServiceVersion string `mapstructure:"service_version"`
+}
+
 // Init configures the global TracerProvider and MeterProvider with OTLP HTTP
-// exporters. serviceName and serviceVersion are attached as resource attributes.
-// Returns a shutdown func; (nil, nil) means OTel is disabled.
-func Init(ctx context.Context, serviceName, serviceVersion string) (func(context.Context) error, error) {
-	if sdkDisabled() {
-		log.Printf("otel: SDK disabled via OTEL_SDK_DISABLED, skipping init")
+// exporters. name and version fall back to cfg.ServiceName / cfg.ServiceVersion
+// when set, otherwise the caller-provided values. Returns a shutdown func;
+// (nil, nil) means OTel is disabled.
+func Init(ctx context.Context, cfg Config, defaultName, defaultVersion string) (func(context.Context) error, error) {
+	if !cfg.Enabled {
+		slog.Info("otel: disabled via config, skipping init")
 		return nil, nil
+	}
+
+	name := cfg.ServiceName
+	if strings.TrimSpace(name) == "" {
+		name = defaultName
+	}
+	version := cfg.ServiceVersion
+	if strings.TrimSpace(version) == "" {
+		version = defaultVersion
 	}
 
 	res, err := resource.New(ctx,
@@ -41,21 +67,29 @@ func Init(ctx context.Context, serviceName, serviceVersion string) (func(context
 		resource.WithTelemetrySDK(),
 		resource.WithSchemaURL(semconv.SchemaURL),
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String(serviceName),
-			semconv.ServiceVersionKey.String(serviceVersion),
+			semconv.ServiceNameKey.String(name),
+			semconv.ServiceVersionKey.String(version),
 		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("otel resource: %w", err)
 	}
 
-	// Exporters read OTEL_EXPORTER_OTLP_* env vars themselves.
-	traceExp, err := otlptracehttp.New(ctx)
+	traceOpts, metricOpts, err := exporterOptions(cfg.ExporterOTLPEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("otel exporter endpoint: %w", err)
+	}
+
+	traceExp, err := otlptracehttp.New(ctx, traceOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("otel trace exporter: %w", err)
 	}
-	metricExp, err := otlpmetrichttp.New(ctx)
+	metricExp, err := otlpmetrichttp.New(ctx, metricOpts...)
 	if err != nil {
+		// traceExp holds HTTP connections; shut it down so it doesn't leak.
+		if shutErr := traceExp.Shutdown(ctx); shutErr != nil {
+			return nil, fmt.Errorf("otel metric exporter: %w (also trace shutdown: %v)", err, shutErr)
+		}
 		return nil, fmt.Errorf("otel metric exporter: %w", err)
 	}
 
@@ -87,6 +121,45 @@ func Init(ctx context.Context, serviceName, serviceVersion string) (func(context
 	}, nil
 }
 
-func sdkDisabled() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")), "true")
+// endpointConfig holds the parsed result of an OTLP HTTP URL.
+type endpointConfig struct {
+	host     string
+	insecure bool
+}
+
+// exporterOptions turns an OTLP HTTP URL like "http://localhost:4318" into the
+// trace and metric exporter option slices. Empty input returns no options,
+// letting the SDK fall back to its built-in default (https://localhost:4318).
+func exporterOptions(endpoint string) ([]otlptracehttp.Option, []otlpmetrichttp.Option, error) {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return nil, nil, nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse %q: %w", endpoint, err)
+	}
+	if u.Host == "" {
+		return nil, nil, fmt.Errorf("endpoint %q missing host", endpoint)
+	}
+
+	ec := endpointConfig{host: u.Host}
+	switch strings.ToLower(u.Scheme) {
+	case "http":
+		ec.insecure = true
+	case "https", "":
+		// keep TLS
+	default:
+		return nil, nil, fmt.Errorf("unsupported scheme %q in endpoint %q", u.Scheme, endpoint)
+	}
+
+	var traceOpts []otlptracehttp.Option
+	var metricOpts []otlpmetrichttp.Option
+	traceOpts = append(traceOpts, otlptracehttp.WithEndpoint(ec.host))
+	metricOpts = append(metricOpts, otlpmetrichttp.WithEndpoint(ec.host))
+	if ec.insecure {
+		traceOpts = append(traceOpts, otlptracehttp.WithInsecure())
+		metricOpts = append(metricOpts, otlpmetrichttp.WithInsecure())
+	}
+	return traceOpts, metricOpts, nil
 }
