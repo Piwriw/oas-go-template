@@ -32,3 +32,15 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// VersionInfo defines model for VersionInfo.
+type VersionInfo struct {
+	// BuildTime Build timestamp in RFC3339 UTC
+	BuildTime string `json:"buildTime"`
+
+	// GitCommit Full git commit SHA
+	GitCommit string `json:"gitCommit"`
+
+	// Version Semver (or git describe) of the build
+	Version string `json:"version"`
+}

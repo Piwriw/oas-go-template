@@ -27,6 +27,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /version:
+    get:
+      operationId: getVersion
+      summary: Build version info
+      tags:
+        - system
+      responses:
+        '200':
+          description: build metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionInfo'
 components:
   schemas:
     Health:
@@ -39,6 +52,22 @@ components:
           enum: [ok]
         version:
           type: string
+    VersionInfo:
+      type: object
+      required:
+        - version
+        - gitCommit
+        - buildTime
+      properties:
+        version:
+          type: string
+          description: Semver (or git describe) of the build
+        gitCommit:
+          type: string
+          description: Full git commit SHA
+        buildTime:
+          type: string
+          description: Build timestamp in RFC3339 UTC
     Error:
       type: object
       required:

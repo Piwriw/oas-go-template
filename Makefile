@@ -1,19 +1,29 @@
 # oas-go-template Makefile
 .PHONY: help gen build run run-client test lint docker dev clean web-dev web-build
 
+# Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
+VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+GIT_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+VERSION_PKG := github.com/piwriw/oas-go-template/internal/version
+LDFLAGS     := -X $(VERSION_PKG).Version=$(VERSION) \
+               -X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) \
+               -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
+
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 gen:  ## Generate code from spec/openapi.yaml
 	./scripts/gen.sh
 
-build:  ## Build server and client binaries into ./bin
+build:  ## Build server and client binaries into ./bin (with version ldflags)
 	mkdir -p bin
-	go build -o bin/server ./cmd/server
-	go build -o bin/client ./cmd/client
+	go build -ldflags "$(LDFLAGS)" -o bin/server ./cmd/server
+	go build -ldflags "$(LDFLAGS)" -o bin/client ./cmd/client
 
-run:  ## Run server locally
-	go run ./cmd/server
+run:  ## Run server locally (with version ldflags)
+	go run -ldflags "$(LDFLAGS)" ./cmd/server
 
 run-client:  ## Run client locally (assumes server is up)
 	go run ./cmd/client
@@ -25,7 +35,13 @@ lint:  ## Run golangci-lint
 	golangci-lint run
 
 docker:  ## Build server docker image (override GOPROXY via env if behind restricted network)
-	docker build -f build/Dockerfile $(if $(GOPROXY),--build-arg GOPROXY=$(GOPROXY)) -t oas-go-template:latest .
+	docker build \
+	  --build-arg VERSION=$(VERSION) \
+	  --build-arg GIT_COMMIT=$(GIT_COMMIT) \
+	  --build-arg BUILD_TIME=$(BUILD_TIME) \
+	  -f build/Dockerfile \
+	  $(if $(GOPROXY),--build-arg GOPROXY=$(GOPROXY)) \
+	  -t oas-go-template:latest .
 
 dev:  ## Run server with live reload (requires air: go install github.com/air-verse/air@latest)
 	air

@@ -6,6 +6,11 @@ FROM golang:1.25-alpine AS builder
 ARG GOPROXY=https://proxy.golang.org,direct
 ENV GOPROXY=${GOPROXY}
 
+# Build metadata (override via --build-arg). Defaults match Makefile.
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
 WORKDIR /src
 
 # Cache deps first
@@ -15,12 +20,15 @@ RUN go mod download
 # Copy the rest of the source
 COPY . .
 
-# Build a static binary
-# CGO_DISABLED=1 + -ldflags '-extldflags "-static"' for static link
-# trimpath removes absolute paths for reproducibility
+# Build a static binary with version metadata injected via ldflags.
+# CGO_DISABLED=1 + -ldflags '-extldflags "-static"' for static link.
+# trimpath removes absolute paths for reproducibility.
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
-    -ldflags='-s -w -extldflags "-static"' \
+    -ldflags="-s -w -extldflags \"-static\" \
+      -X github.com/piwriw/oas-go-template/internal/version.Version=${VERSION} \
+      -X github.com/piwriw/oas-go-template/internal/version.GitCommit=${GIT_COMMIT} \
+      -X github.com/piwriw/oas-go-template/internal/version.BuildTime=${BUILD_TIME}" \
     -o /out/server \
     ./cmd/server
 
