@@ -1,10 +1,18 @@
 // Package handler implements the StrictServerInterface generated from OAS.
 package handler
 
-// Handler implements internal/api.StrictServerInterface.
-type Handler struct{}
+import "gorm.io/gorm"
 
-// New returns a new Handler.
-func New() *Handler {
-	return &Handler{}
+// Handler implements internal/api.StrictServerInterface.
+//
+// db may be nil when the server boots without a configured database —
+// /readyz then reports "not ready" with a 503 instead of crashing.
+type Handler struct {
+	db *gorm.DB
+}
+
+// New returns a Handler wired to the given dependencies. Pass nil for any
+// dependency that isn't available; affected endpoints degrade gracefully.
+func New(gdb *gorm.DB) *Handler {
+	return &Handler{db: gdb}
 }

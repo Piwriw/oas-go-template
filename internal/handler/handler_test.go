@@ -10,7 +10,7 @@ import (
 var _ api.StrictServerInterface = (*Handler)(nil)
 
 func TestNewReturnsHandler(t *testing.T) {
-	if New() == nil {
-		t.Fatal("New() returned nil")
+	if New(nil) == nil {
+		t.Fatal("New(nil) returned nil")
 	}
 }

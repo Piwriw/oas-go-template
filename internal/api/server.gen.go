@@ -15,9 +15,12 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Health check
+	// Liveness probe — process is up and serving.
 	// (GET /healthz)
 	GetHealth(c *gin.Context)
+	// Readiness probe — dependencies (e.g. DB) are reachable.
+	// (GET /readyz)
+	GetReady(c *gin.Context)
 	// Build version info
 	// (GET /version)
 	GetVersion(c *gin.Context)
@@ -43,6 +46,19 @@ func (siw *ServerInterfaceWrapper) GetHealth(c *gin.Context) {
 	}
 
 	siw.Handler.GetHealth(c)
+}
+
+// GetReady operation middleware
+func (siw *ServerInterfaceWrapper) GetReady(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetReady(c)
 }
 
 // GetVersion operation middleware
@@ -86,6 +102,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	}
 
 	router.GET(options.BaseURL+"/healthz", wrapper.GetHealth)
+	router.GET(options.BaseURL+"/readyz", wrapper.GetReady)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 }
 
@@ -124,6 +141,41 @@ func (response GetHealth500JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	return err
 }
 
+type GetReadyRequestObject struct {
+}
+
+type GetReadyResponseObject interface {
+	VisitGetReadyResponse(w http.ResponseWriter) error
+}
+
+type GetReady200JSONResponse Health
+
+func (response GetReady200JSONResponse) VisitGetReadyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReady503JSONResponse Error
+
+func (response GetReady503JSONResponse) VisitGetReadyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVersionRequestObject struct {
 }
 
@@ -147,9 +199,12 @@ func (response GetVersion200JSONResponse) VisitGetVersionResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// Health check
+	// Liveness probe — process is up and serving.
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// Readiness probe — dependencies (e.g. DB) are reachable.
+	// (GET /readyz)
+	GetReady(ctx context.Context, request GetReadyRequestObject) (GetReadyResponseObject, error)
 	// Build version info
 	// (GET /version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -229,6 +284,30 @@ func (sh *strictHandler) GetHealth(ctx *gin.Context) {
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
 		if err := validResponse.VisitGetHealthResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetReady operation middleware
+func (sh *strictHandler) GetReady(ctx *gin.Context) {
+	var request GetReadyRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReady(ctx, request.(GetReadyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReady")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GetReadyResponseObject); ok {
+		if err := validResponse.VisitGetReadyResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {

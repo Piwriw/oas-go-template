@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -22,24 +21,28 @@ func (h *Handler) GetVersion(ctx context.Context, _ api.GetVersionRequestObject)
 	defer span.End()
 
 	info := version.Info()
+	// Degrade to "dev" rather than 500 — running via `go run` (no ldflags) is
+	// common during development and /version should still work.
+	if info.Version == "" {
+		info.Version = "dev"
+	}
+	if info.GitCommit == "" {
+		info.GitCommit = "unknown"
+	}
+	if info.BuildTime == "" {
+		info.BuildTime = "unknown"
+	}
+
 	span.SetAttributes(
 		attribute.String("version.info.version", info.Version),
 		attribute.String("version.info.git_commit", info.GitCommit),
 		attribute.String("version.info.build_time", info.BuildTime),
 	)
-
-	if info.Version == "" {
-		err := fmt.Errorf("version not injected")
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return nil, err
-	}
-
 	span.SetStatus(codes.Ok, "")
+
 	return api.GetVersion200JSONResponse(api.VersionInfo{
 		Version:   info.Version,
 		GitCommit: info.GitCommit,
 		BuildTime: info.BuildTime,
 	}), nil
 }
-
