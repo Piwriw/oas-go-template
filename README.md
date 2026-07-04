@@ -9,6 +9,7 @@ server stubs and client SDK from a single source of truth: `spec/openapi.yaml`.
 - Go 1.23+
 - gin (HTTP framework)
 - oapi-codegen (code generation)
+- Gorm (ORM, postgres/mysql/sqlite)
 - React + Vite + TypeScript (frontend, deployed separately)
 - Docker / golangci-lint / Make
 
@@ -26,6 +27,23 @@ make lint      # run golangci-lint
 make docker    # build server docker image
 ```
 
+## Configuration
+
+All runtime config lives in `config.yaml`. Copy the example to start:
+
+```bash
+cp config.example.yaml config.yaml
+./bin/server                       # picks up ./config.yaml automatically
+./bin/server -c /etc/app/prod.yaml # or pass an explicit path
+```
+
+`config.yaml` is gitignored — only `config.example.yaml` is tracked. Secrets
+(DSN, OTLP endpoint, etc.) live in your local `config.yaml`, never in git.
+
+Missing `config.yaml` is fine — built-in defaults take over so tests and
+scratch runs don't need to author one. Validation (`gin_mode`, `log.format`,
+`db.driver` whitelist, etc.) runs after YAML has been merged into defaults.
+
 ## Local Observability Stack
 
 `docker-compose.yml` boots an OpenTelemetry Collector + Jaeger all-in-one so you
@@ -33,8 +51,7 @@ can verify traces end-to-end without any cloud account.
 
 ```bash
 make dev-stack                                       # start collector + Jaeger
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
-  ./bin/server                                       # point the server at the collector
+./bin/server                                         # reads config.yaml (otel.exporter_otlp_endpoint → collector)
 # in another shell, generate some traffic:
 curl -sf http://localhost:8080/healthz
 curl -sf http://localhost:8080/version
@@ -57,6 +74,33 @@ docker pull docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0
 docker tag docker.1ms.run/jaegertracing/all-in-one:1.60 jaegertracing/all-in-one:1.60
 docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/opentelemetry-collector-contrib:0.110.0
 ```
+
+## Database (Gorm)
+
+DB is **opt-in**. Set `db.driver` in `config.yaml` and the server connects at
+boot; leave it empty and the server runs DB-free.
+
+```yaml
+# config.yaml
+db:
+  driver: postgres                              # postgres | mysql | sqlite; empty = disabled
+  dsn: "host=localhost user=app password=app dbname=app sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 30m
+```
+
+| yaml | default | notes |
+|------|---------|-------|
+| `db.driver` | empty | `postgres` / `mysql` / `sqlite`; empty = disabled |
+| `db.dsn` | — | required when driver is set |
+| `db.max_open_conns` | `25` | |
+| `db.max_idle_conns` | `5` | |
+| `db.conn_max_lifetime` | `30m` | any `time.ParseDuration` form |
+
+Every SQL operation becomes an OTel span via `gorm.io/plugin/opentelemetry`.
+For sqlite tests use `file::memory:?cache=shared` plus `max_open_conns: 1`
+(see `internal/db/db_test.go`).
 
 ## Workflow
 

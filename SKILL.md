@@ -31,12 +31,14 @@ Don't use this skill for:
 | `spec/openapi.yaml` | The contract. Server stubs and client SDK are generated from this. | **Yes — your real API goes here** |
 | `oapi-codegen.yaml` | Generator base config (package name only). | Only if changing package layout |
 | `scripts/gen.sh` | Calls oapi-codegen 4 times to produce types + server + client code. | No |
+| `config.example.yaml` | Sample config; copy to `config.yaml` (gitignored) and edit. | Yes — your real defaults go here |
 | `cmd/server/main.go` | Server entrypoint. Wires config → otel → gin → handler. | Rename `serviceName` const; otherwise rarely |
 | `cmd/client/main.go` | Example client of `pkg/api`. | Optional |
 | `internal/api/*.gen.go` | **Generated**. Server types + gin bindings + `StrictServerInterface`. | Never hand-edit |
 | `internal/handler/` | Your business logic. Implements `StrictServerInterface`. | **Yes — real logic here** |
 | `internal/middleware/` | Custom gin middleware (logger). | Add more here |
-| `internal/config/` | Reads `HTTP_ADDR`, `GIN_MODE` from env. | Add fields as needed |
+| `internal/config/` | Loads `config.yaml` and validates. | Add fields as needed |
+| `internal/db/` | Gorm init with OTel plugin + connection pool. Disabled when `db.driver` empty. | Yes — register models / add migrations once you adopt it |
 | `internal/logging/` | slog setup with trace_id/span_id/request_id injection. | No |
 | `internal/otel/` | OTel SDK init (OTLP HTTP traces+metrics). | No |
 | `internal/version/` | Holds `Version` / `GitCommit` / `BuildTime` for ldflags. | No |
@@ -188,9 +190,9 @@ The template ships a `docker-compose.yml` (Jaeger + otel-collector) so you can
 **prove** the trace pipeline works before relying on it.
 
 ```bash
-make dev-stack                                              # start Jaeger + collector
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
-  ./bin/server                                              # or: make run
+cp config.example.yaml config.yaml   # make sure otel.exporter_otlp_endpoint = http://localhost:4318
+make dev-stack                        # start Jaeger + collector
+./bin/server                          # or: make run
 curl -sf http://localhost:8080/healthz                      # generate a request
 # Jaeger UI: http://localhost:16686 → Service = <serviceName>
 make dev-stack-down                                         # stop when done
@@ -217,8 +219,29 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 ```
 
 To disable OTel entirely (e.g. in unit tests or local dev), set
-`OTEL_SDK_DISABLED=true` — `otel.Init` returns `(nil, nil)` and the server
-runs without exporting.
+`otel.enabled: false` in `config.yaml` — `otel.Init` returns `(nil, nil)` and
+the server runs without exporting.
+
+## Database (Gorm) — opt-in
+
+`internal/db` ships a Gorm setup with the OTel tracing plugin pre-registered.
+**Disabled by default** — leave `db.driver` empty in `config.yaml` and the
+server boots DB-free. Set it + `db.dsn` and `cmd/server/main.go` connects at
+boot, closes on shutdown.
+
+```yaml
+# config.yaml
+db:
+  driver: postgres                              # postgres | mysql | sqlite
+  dsn: "host=localhost user=app password=app dbname=app sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 30m
+```
+
+The handler doesn't yet take `*gorm.DB` — when you adopt it, extend
+`handler.New()` to accept a `*gorm.DB` (or an interface) and pass it from
+`cmd/server/main.go`. Stash it on the `Handler` struct.
 
 ## Common Mistakes & Traps
 
@@ -340,6 +363,28 @@ If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a
 Docker registry mirror, or pre-pull from a CN mirror and re-tag (see the
 "Verifying OTel end-to-end" section above for exact commands). Jaeger 1.62 in
 particular is missing from some mirrors — 1.60 is widely mirrored.
+
+### 13. SQLite `:memory:` is per-connection
+
+Each connection to `file::memory:` gets its own private database. With a
+connection pool, your migration lands on connection A, the next query runs on
+connection B which sees an empty DB. Fix: use `file::memory:?cache=shared`
+**and** set `DB_MAX_OPEN_CONNS=1`. The `internal/db/db_test.go` test does
+exactly this.
+
+### 14. Pass `*gorm.DB` via the handler constructor
+
+Don't reach for a package-level global `db.DB`. When you start using Gorm in
+business logic, change `handler.New()` to `handler.New(gdb)` and store it on
+the struct. Keeps tests able to swap a sqlite memory DB.
+
+### 15. Missing `config.yaml` is **not** an error
+
+`config.Load` falls back to built-in defaults when the file is absent — that
+way tests and scratch runs work without authoring a config. If your prod
+deployment requires the file (e.g. you don't want to silently boot with
+defaults), check existence yourself before calling `Load`, or fail validation
+in `internal/config.validate(...)` for envs where the defaults are unsafe.
 
 ## Daily Workflow Once Renamed
 
