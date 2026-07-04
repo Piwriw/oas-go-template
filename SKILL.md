@@ -169,6 +169,33 @@ docker stop smoke
 
 If `make gen` produced a `git status` diff after this, generation isn't idempotent — investigate before committing.
 
+### Step 8 — Rename the Helm chart (if you kept it)
+
+`chart/` still references the old project name. Step 2's sed loop only touches
+`*.go`, `Makefile`, `build/Dockerfile`, and `scripts/gen.sh` — the chart needs
+its own pass.
+
+```bash
+NEW=my-new-project   # last segment of your module path
+
+# 1) Chart name + helpers + README + NOTES reference "oas-go-template".
+grep -rl 'oas-go-template' chart/ \
+  | xargs sed -i.bak "s/oas-go-template/${NEW}/g"
+find chart -name '*.bak' -delete
+
+# 2) Image repositories in chart/values.yaml — these are registry paths, not
+#    derivable from the module name. Edit by hand:
+#      server.image.repository: oas-go-template       → <registry>/${NEW}
+#      web.image.repository:    oas-go-template-web   → <registry>/${NEW}-web
+
+# 3) Validate.
+make helm-lint
+make helm-template
+```
+
+Skip this entirely if you don't deploy via Helm — `rm -rf chart/` is fine; the
+rest of the project (build, test, lint) doesn't reference it.
+
 ## Make Targets
 
 | Target | What |
