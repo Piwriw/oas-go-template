@@ -1,0 +1,104 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+`oas-go-template` is a Go project template where **`spec/openapi.yaml` is the single source of truth**. Server stubs and the client SDK are generated from it via `oapi-codegen` (v2 StrictServerInterface mode). All other code (config, otel, logging, db, handlers) supports that contract.
+
+For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md is for working **inside** the repo.
+
+## Commands
+
+| Task | Command |
+|------|---------|
+| Regenerate code from `spec/openapi.yaml` | `make gen` |
+| Build server + client | `make build` |
+| Run server (with ldflags) | `make run` |
+| Run all tests | `make test` |
+| Run a single test | `go test -run TestLoad_fullYAML ./internal/config` |
+| Lint (golangci-lint v2) | `make lint` |
+| Format (goimports, three-group) | `make fmt` |
+| Security audit (govulncheck + gosec) | `make audit` |
+| Build server Docker image | `make docker` |
+| Build frontend Docker image | `make web-docker` |
+| Local Jaeger + OTel collector | `make dev-stack` / `make dev-stack-down` |
+
+`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`.
+
+## Architecture
+
+### OAS-driven codegen (4 outputs, one spec)
+
+`scripts/gen.sh` invokes `oapi-codegen` four times against `spec/openapi.yaml`:
+
+| Output | Package | Role |
+|--------|---------|------|
+| `internal/api/types.gen.go` | `api` | server-side models |
+| `internal/api/server.gen.go` | `api` | gin bindings + `StrictServerInterface` |
+| `pkg/api/types.gen.go` | `api` | client-side models (separate copy — `pkg/` cannot import `internal/`) |
+| `pkg/api/client.gen.go` | `api` | client SDK |
+
+`pkg/` mirrors `internal/` because Go's import visibility prevents the public client from importing the server's types — both copies must exist.
+
+**Never hand-edit `*.gen.go`.** They are committed (not gitignored) so reviewers and IDEs see what's compiled.
+
+### StrictServerInterface pattern
+
+Handlers in `internal/handler/` implement `api.StrictServerInterface` — a generated interface where each method returns a typed `ResponseObject` (`GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc.). The constructor `api.NewStrictHandler(h, nil)` wraps them; `api.RegisterHandlers(r, strictHandler)` mounts them on gin. There is a compile-time check `var _ api.StrictServerInterface = (*Handler)(nil)` in `internal/handler/handler_test.go` so missing methods fail the build.
+
+Response type names come from the OAS status code + schema — **only use names that already exist in `internal/api/server.gen.go`**, never invent them.
+
+### Request lifecycle and middleware ordering
+
+`cmd/server/main.go:newHTTPServer` wires the chain in this exact order:
+
+```go
+r.Use(gin.Recovery(), otelgin.Middleware(serviceName), logging.Middleware())
+```
+
+`otelgin` must run **before** `logging.Middleware` — logging reads the active span from `c.Request.Context()` to inject `trace_id` / `span_id` into each slog record (see `internal/logging/logging.go:otelHandler`). Reverse the order and trace context silently disappears from logs.
+
+### Config loading
+
+`internal/config/config.go:Load` merges in this order:
+1. Built-in `defaults()` (HTTPAddr `:8000`, GinMode `debug`, OTel enabled, pool sizes, etc.)
+2. `config.yaml` (path from `-c` flag, default `config.yaml`)
+
+There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + DSN-required-when-driver-set, etc.).
+
+`config.yaml` is gitignored; commit only `config.example.yaml`.
+
+### OTel init
+
+`internal/otel/otel.go:Init` sets up TracerProvider + MeterProvider with OTLP HTTP exporters, using `semconv/v1.41.0` (must match the OTel SDK's bundled detectors — see SKILL.md trap #5). Returns `(nil, nil)` when `cfg.Enabled=false`. `cmd/server/main.go:run` defers `shutdownOTel` so exporter flush happens on signal.
+
+### DB (Gorm, opt-in)
+
+`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout.
+
+`*gorm.DB` is injected via `handler.New(gdb)`; **`db` may be nil** and `/readyz` reports 503 in that case (graceful degradation, not panic). Use the same pattern for any new dependency.
+
+For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — see `internal/db/db_test.go`. With a connection pool, each connection otherwise gets its own private memory DB.
+
+### /healthz vs /readyz
+
+Two separate probes in `internal/handler/health.go`:
+- `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
+- `GET /readyz` — **readiness**. 200 only when configured deps are reachable (currently: `db.PingContext`); 503 when `db==nil` or ping fails. Don't add expensive checks to `/healthz`.
+
+### Version injection
+
+`internal/version/version.go` holds `Version` / `GitCommit` / `BuildTime` populated via `-ldflags -X` (see `Makefile:LDFLAGS` and `build/Dockerfile`). `go run` skips ldflags → empty fields → `internal/handler/version.go` degrades to `"dev"` / `"unknown"` so `/version` still returns 200 instead of 500. Don't error on empty version fields.
+
+### Frontend is independent
+
+`web/` (Vite + React + TS) deploys separately from the server. `web/Dockerfile` is multi-stage (node → nginx-unprivileged on `:8080`); backend runs on `:8000`. The server does **not** serve `web/dist`. There is no typed client generated into `web/src/api/` — that's intentional (left for the user's stack choice).
+
+## Watch-outs
+
+- **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
+- **`os.Exit(0)` after defers**: gocritic's `exitAfterDefer` will fail lint. `main` returns through `run()` and exits via `os.Exit(1)` only on error — keep it that way.
+- **Empty OAS spec breaks the build**: keep at least one path and one schema in `spec/openapi.yaml`, otherwise `cmd/server/main.go` references symbols that no longer exist after `make gen`.
+- **`config.example.yaml` comments mention `env: HTTP_ADDR` etc.** but env overlay was removed — only YAML drives config. Treat those comment labels as legacy.
+- **OTel `semconv` version is pinned to v1.41.0** for a reason (matches SDK detectors — bumping it crashes resource init with a conflicting Schema URL error). Update only when you also bump `go.opentelemetry.io/otel`.
