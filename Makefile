@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen build run run-client test lint docker dev clean web-dev web-build
+.PHONY: help gen build run run-client test lint docker dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -54,3 +54,9 @@ web-build:  ## Build frontend
 
 clean:  ## Remove build artifacts
 	rm -rf bin web/dist
+
+dev-stack:  ## Start local OTel collector + Jaeger (docker compose up -d)
+	docker compose up -d
+
+dev-stack-down:  ## Stop local OTel collector + Jaeger
+	docker compose down

@@ -26,6 +26,38 @@ make lint      # run golangci-lint
 make docker    # build server docker image
 ```
 
+## Local Observability Stack
+
+`docker-compose.yml` boots an OpenTelemetry Collector + Jaeger all-in-one so you
+can verify traces end-to-end without any cloud account.
+
+```bash
+make dev-stack                                       # start collector + Jaeger
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+  ./bin/server                                       # point the server at the collector
+# in another shell, generate some traffic:
+curl -sf http://localhost:8080/healthz
+curl -sf http://localhost:8080/version
+# open Jaeger UI:
+open http://localhost:16686                          # search Service = oas-go-template
+make dev-stack-down                                  # stop when done
+```
+
+Each log line carries `trace_id` / `span_id` because `otelgin.Middleware`
+runs before `logging.Middleware` (see `cmd/server/main.go`). Paste the
+`trace_id` straight into Jaeger's "Find a trace" box to jump from a log
+entry to the corresponding trace.
+
+If `docker compose up` can't pull images, configure a Docker registry
+mirror in your daemon, or pull images from a CN-friendly mirror and re-tag:
+
+```bash
+docker pull docker.1ms.run/jaegertracing/all-in-one:1.60
+docker pull docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0
+docker tag docker.1ms.run/jaegertracing/all-in-one:1.60 jaegertracing/all-in-one:1.60
+docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/opentelemetry-collector-contrib:0.110.0
+```
+
 ## Workflow
 
 1. Edit `spec/openapi.yaml`.

@@ -37,11 +37,14 @@ Don't use this skill for:
 | `internal/handler/` | Your business logic. Implements `StrictServerInterface`. | **Yes — real logic here** |
 | `internal/middleware/` | Custom gin middleware (logger). | Add more here |
 | `internal/config/` | Reads `HTTP_ADDR`, `GIN_MODE` from env. | Add fields as needed |
+| `internal/logging/` | slog setup with trace_id/span_id/request_id injection. | No |
 | `internal/otel/` | OTel SDK init (OTLP HTTP traces+metrics). | No |
 | `internal/version/` | Holds `Version` / `GitCommit` / `BuildTime` for ldflags. | No |
 | `pkg/api/*.gen.go` | **Generated**. Client SDK + client-side types. | Never hand-edit |
 | `web/` | Vite + React + TS frontend (independent deploy). | Replace with your UI |
 | `build/Dockerfile` | Multi-stage build → static Go binary in alpine. | No |
+| `build/otelcol/config.yaml` | Local OTel collector pipeline (OTLP in → Jaeger + debug out). | Tweak exporters if you want Tempo/Prometheus instead |
+| `docker-compose.yml` | Local Jaeger + otel-collector for trace verification. | No |
 | `Makefile` | All common commands. | No |
 | `.golangci.yml` | Lint config; excludes `*.gen.go`. | No |
 
@@ -176,7 +179,46 @@ If `make gen` produced a `git status` diff after this, generation isn't idempote
 | `make lint` | `golangci-lint run` |
 | `make docker` | Build server image (pass `GOPROXY=...` if behind GFW; passes `VERSION/GIT_COMMIT/BUILD_TIME` automatically) |
 | `make web-dev` / `make web-build` | Frontend |
+| `make dev-stack` / `make dev-stack-down` | Start / stop local Jaeger + OTel collector |
 | `make clean` | Remove `bin/` and `web/dist/` |
+
+## Verifying OTel end-to-end
+
+The template ships a `docker-compose.yml` (Jaeger + otel-collector) so you can
+**prove** the trace pipeline works before relying on it.
+
+```bash
+make dev-stack                                              # start Jaeger + collector
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+  ./bin/server                                              # or: make run
+curl -sf http://localhost:8080/healthz                      # generate a request
+# Jaeger UI: http://localhost:16686 → Service = <serviceName>
+make dev-stack-down                                         # stop when done
+```
+
+What to look for:
+
+- **Log lines** include `trace_id` and `span_id` because `otelgin.Middleware`
+  runs before `logging.Middleware()` in `cmd/server/main.go`. If you swap their
+  order, you lose trace context in logs.
+- **Jaeger UI** shows the service with one server span per request plus any
+  child spans the handler creates (e.g. `internal/handler/version.go` opens a
+  manual `Handler.GetVersion` span).
+- **`trace_id` in logs matches the trace ID in Jaeger** — copy-paste to confirm.
+
+If `docker compose up` can't pull images (GFW), pull from a CN mirror and
+re-tag, or configure a registry mirror in your Docker daemon:
+
+```bash
+docker pull docker.1ms.run/jaegertracing/all-in-one:1.60
+docker pull docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0
+docker tag docker.1ms.run/jaegertracing/all-in-one:1.60 jaegertracing/all-in-one:1.60
+docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/opentelemetry-collector-contrib:0.110.0
+```
+
+To disable OTel entirely (e.g. in unit tests or local dev), set
+`OTEL_SDK_DISABLED=true` — `otel.Init` returns `(nil, nil)` and the server
+runs without exporting.
 
 ## Common Mistakes & Traps
 
@@ -278,6 +320,26 @@ If you reach for `os.Exit(0)` at the end of `main`, gocritic flags `exitAfterDef
 ### 10. Generated code must be checked in, not gitignored
 
 `*.gen.go` files are committed to git. They are stable across runs (`make gen` is idempotent — verified by `git status` being clean afterwards). Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled.
+
+### 11. Middleware order: `otelgin` BEFORE `logging`
+
+`logging.Middleware()` reads the active span from `c.Request.Context()` to inject
+`trace_id` / `span_id` into each log record. `otelgin.Middleware` is what puts
+the span there. Reversed order → no trace context in logs, and you'll be
+debugging "where did trace_id go?" for an hour.
+
+The correct chain in `cmd/server/main.go`:
+
+```go
+r.Use(gin.Recovery(), otelgin.Middleware(serviceName), logging.Middleware())
+```
+
+### 12. `docker compose up` can't pull images (GFW)
+
+If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a
+Docker registry mirror, or pre-pull from a CN mirror and re-tag (see the
+"Verifying OTel end-to-end" section above for exact commands). Jaeger 1.62 in
+particular is missing from some mirrors — 1.60 is widely mirrored.
 
 ## Daily Workflow Once Renamed
 
