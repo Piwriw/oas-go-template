@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/piwriw/oas-go-template/internal/api"
+	"github.com/piwriw/oas-go-template/internal/errcode"
 	"github.com/piwriw/oas-go-template/internal/version"
 )
 
@@ -20,23 +21,27 @@ func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (ap
 // GetReady implements api.StrictServerInterface.GetReady — readiness probe.
 // Returns 200 when configured dependencies are reachable; 503 when a
 // dependency hasn't been wired (e.g. db.driver empty) or is failing.
+//
+// Errors are intentionally converted to typed 503 responses and paired with
+// a nil return error — StrictServerInterface convention. Returning the raw
+// err would route to gin's generic 500 path and discard the structured body.
 func (h *Handler) GetReady(ctx context.Context, _ api.GetReadyRequestObject) (api.GetReadyResponseObject, error) {
 	if h.db == nil {
 		return api.GetReady503JSONResponse(api.Error{
-			Code:    "db_unavailable",
+			Code:    int32(errcode.DBUnavailable),
 			Message: "db not configured",
 		}), nil
 	}
 	sqlDB, err := h.db.DB()
 	if err != nil {
 		return api.GetReady503JSONResponse(api.Error{
-			Code:    "db_handle",
+			Code:    int32(errcode.DBHandle),
 			Message: err.Error(),
 		}), nil
 	}
 	if err := sqlDB.PingContext(ctx); err != nil {
 		return api.GetReady503JSONResponse(api.Error{
-			Code:    "db_ping",
+			Code:    int32(errcode.DBPing),
 			Message: err.Error(),
 		}), nil
 	}

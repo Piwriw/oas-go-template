@@ -7,14 +7,26 @@ run:
 linters:
   default: standard
   enable:
+    # Bug-finders (high signal, low noise)
     - errcheck
-    - gocritic
-    - govet
+    - bodyclose        # unchecked http.Response.Body.Close — common goroutine/socket leak
+    - errorlint        # errors.Is vs ==, %w vs %v misuse, type-assertion safety
+    - wastedassign     # writes that are never read
     - ineffassign
-    - revive
+    - govet
     - staticcheck
     - unused
+
+    # Style & quality
+    - revive
+    - gocritic
+    - gocyclo          # cyclomatic complexity (see settings)
+    - unconvert        # useless type conversions like `string(s)` where s is already string
+    - unparam          # unused function parameters / return values
     - misspell
+  settings:
+    gocyclo:
+      min-complexity: 15   # default 30; Prometheus=10, Kubernetes=20 — pick a middle ground
 
 issues:
   exclude-rules:
@@ -24,3 +36,12 @@ issues:
         - all
   max-issues-per-linter: 0
   max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/piwriw/oas-go-template

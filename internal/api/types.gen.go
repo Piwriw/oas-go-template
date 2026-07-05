@@ -20,7 +20,8 @@ func (e HealthStatus) Valid() bool {
 
 // Error defines model for Error.
 type Error struct {
-	Code    string `json:"code"`
+	// Code Numeric business error code. Range allocation — 10xxx validation, 20xxx auth, 30xxx not-found, 50xxx infra/db, 99xxx internal. See internal/errcode/errcode.go for the canonical list.
+	Code    int32  `json:"code"`
 	Message string `json:"message"`
 }
 

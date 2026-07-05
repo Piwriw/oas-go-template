@@ -94,6 +94,11 @@ components:
         - message
       properties:
         code:
-          type: string
+          type: integer
+          description: Numeric business error code. Range allocation — 10xxx
+            validation, 20xxx auth, 30xxx not-found, 50xxx infra/db, 99xxx
+            internal. See internal/errcode/errcode.go for the canonical list.
+          format: int32
+          minimum: 0
         message:
           type: string

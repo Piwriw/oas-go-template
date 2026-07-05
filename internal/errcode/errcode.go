@@ -1,0 +1,38 @@
+// Package errcode defines the stable numeric codes returned in
+// api.Error.Code. Codes are part of the public API contract even though
+// they don't appear in spec/openapi.yaml — clients branch on them.
+//
+// Use the typed constants below; never construct ad-hoc Code values.
+// Convert at the API boundary with int(c) when assigning to api.Error.Code
+// (which is int32 per the OAS schema).
+//
+// Numbering convention:
+//
+//   - 5-digit codes leave room for ~100 categories × ~100 codes each.
+//   - Ranges are reserved per subsystem; allocate new ranges here in the
+//     doc comment before adding constants.
+//   - Never recycle a retired code's number for a new meaning — clients
+//     in the wild may still be branching on it. Retire by comment, not
+//     by reuse.
+//
+// Range allocation:
+//
+//	10xxx  request / validation
+//	20xxx  auth / authorization
+//	30xxx  not found
+//	50xxx  database / infrastructure
+//	99xxx  internal / unknown
+package errcode
+
+// Code is a stable int32 identifier for an error category returned in
+// api.Error.Code. Compile-time type safety prevents callers from passing
+// arbitrary numbers where a known code is expected.
+type Code int32
+
+// Database-related codes (50xxx) — returned when the configured DB is
+// missing, misbehaving, or unreachable. See internal/handler/health.go:GetReady.
+const (
+	DBUnavailable Code = 50001 // db driver not configured (cfg.DB.Driver empty)
+	DBHandle      Code = 50002 // (*gorm.DB).DB() returned a non-nil error
+	DBPing        Code = 50003 // (*sql.DB).PingContext failed
+)

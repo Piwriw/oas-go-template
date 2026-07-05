@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-func writeFile(t *testing.T, dir, name, body string) string {
+func writeFile(t *testing.T, dir, body string) string {
 	t.Helper()
-	p := filepath.Join(dir, name)
+	p := filepath.Join(dir, "config.yaml")
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatalf("write %s: %v", p, err)
 	}
@@ -18,7 +18,7 @@ func writeFile(t *testing.T, dir, name, body string) string {
 
 func TestLoad_fullYAML(t *testing.T) {
 	dir := t.TempDir()
-	p := writeFile(t, dir, "config.yaml", `
+	p := writeFile(t, dir, `
 server:
   http_addr: ":9999"
   gin_mode: release
@@ -108,7 +108,7 @@ func TestLoad_defaultPathMissingOK(t *testing.T) {
 
 func TestLoad_invalidGinMode(t *testing.T) {
 	dir := t.TempDir()
-	p := writeFile(t, dir, "config.yaml", `
+	p := writeFile(t, dir, `
 server:
   gin_mode: bogus
 `)
@@ -119,7 +119,7 @@ server:
 
 func TestLoad_dbDriverWithoutDSN(t *testing.T) {
 	dir := t.TempDir()
-	p := writeFile(t, dir, "config.yaml", `
+	p := writeFile(t, dir, `
 db:
   driver: postgres
   dsn: ""
@@ -131,7 +131,7 @@ db:
 
 func TestLoad_invalidLogFormat(t *testing.T) {
 	dir := t.TempDir()
-	p := writeFile(t, dir, "config.yaml", `
+	p := writeFile(t, dir, `
 log:
   format: xml
 `)
@@ -146,7 +146,7 @@ log:
 func TestLoad_partialYAMLPreservesDefaults(t *testing.T) {
 	dir := t.TempDir()
 	// Only set server.http_addr; everything else relies on built-in defaults.
-	p := writeFile(t, dir, "config.yaml", `
+	p := writeFile(t, dir, `
 server:
   http_addr: ":9090"
 `)

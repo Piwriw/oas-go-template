@@ -89,7 +89,7 @@ func Init(ctx context.Context, cfg Config, defaultName, defaultVersion string) (
 	if err != nil {
 		// traceExp holds HTTP connections; shut it down so it doesn't leak.
 		if shutErr := traceExp.Shutdown(ctx); shutErr != nil {
-			return nil, fmt.Errorf("otel metric exporter: %w (also trace shutdown: %v)", err, shutErr)
+			return nil, fmt.Errorf("otel metric exporter: %w (also trace shutdown: %w)", err, shutErr)
 		}
 		return nil, fmt.Errorf("otel metric exporter: %w", err)
 	}
@@ -107,7 +107,7 @@ func Init(ctx context.Context, cfg Config, defaultName, defaultVersion string) (
 	promExp, err := otelprom.New()
 	if err != nil {
 		if shutErr := traceExp.Shutdown(ctx); shutErr != nil {
-			return nil, fmt.Errorf("otel prometheus exporter: %w (also trace shutdown: %v)", err, shutErr)
+			return nil, fmt.Errorf("otel prometheus exporter: %w (also trace shutdown: %w)", err, shutErr)
 		}
 		return nil, fmt.Errorf("otel prometheus exporter: %w", err)
 	}
