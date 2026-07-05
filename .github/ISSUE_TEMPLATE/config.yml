@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/piwriw/oas-go-template/security/advisories/new
+    about: For security vulnerabilities. Do NOT file a public issue.
+  - name: Questions / discussions
+    url: https://github.com/piwriw/oas-go-template/discussions
+    about: Use Discussions for "how do I..." questions.
