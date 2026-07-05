@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -97,8 +98,23 @@ func Init(ctx context.Context, cfg Config, defaultName, defaultVersion string) (
 		trace.WithBatcher(traceExp),
 		trace.WithResource(res),
 	)
+
+	// Prometheus exporter exposes OTel-collected metrics on
+	// prometheus.DefaultRegisterer, which /metrics serves via
+	// promhttp.Handler(). Sits alongside the OTLP periodic reader — push
+	// to a collector for high-fidelity tracing, pull from Prometheus for
+	// ops dashboards.
+	promExp, err := otelprom.New()
+	if err != nil {
+		if shutErr := traceExp.Shutdown(ctx); shutErr != nil {
+			return nil, fmt.Errorf("otel prometheus exporter: %w (also trace shutdown: %v)", err, shutErr)
+		}
+		return nil, fmt.Errorf("otel prometheus exporter: %w", err)
+	}
+
 	mp := metric.NewMeterProvider(
 		metric.WithReader(metric.NewPeriodicReader(metricExp)),
+		metric.WithReader(promExp),
 		metric.WithResource(res),
 	)
 

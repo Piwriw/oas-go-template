@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"gorm.io/gorm"
 
@@ -83,8 +84,14 @@ func run(configPath string) error {
 }
 
 // newHTTPServer wires the gin router (recovery + otelgin + logging middleware),
-// registers the strict API handler, and wraps it in an *http.Server with a
-// read-header timeout to defuse slowloris-style attacks.
+// registers the strict API handler, mounts the Prometheus /metrics route,
+// and wraps it all in an *http.Server with a read-header timeout to
+// defuse slowloris-style attacks.
+//
+// The OTel Prometheus exporter (when OTel is enabled in cfg.OTel.Enabled)
+// and client_golang's built-in Go/process collectors both feed
+// prometheus.DefaultRegisterer — /metrics reads from there via
+// promhttp.Handler. No explicit collector registration needed.
 func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	h := handler.New(gdb)
 	strictHandler := api.NewStrictHandler(h, nil)
@@ -93,6 +100,13 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	// otelgin must run before logging so logging.Middleware can read the active span
 	// from c.Request.Context() and inject trace_id into the log line.
 	r.Use(gin.Recovery(), otelgin.Middleware(serviceName), logging.Middleware())
+
+	// /metrics is intentionally NOT in spec/openapi.yaml and not configurable —
+	// it's an ops endpoint, not part of the API contract, and there's no good
+	// reason to disable it. The client SDK doesn't carry a useless
+	// GetMetricsWithResponses method.
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
 	api.RegisterHandlers(r, strictHandler)
 
 	return &http.Server{

@@ -25,3 +25,5 @@ otel:
   exporter_otlp_endpoint: "http://localhost:4318"   # OTLP HTTP URL
   service_name: ""           # leave empty to use cmd/server's hardcoded serviceName
   service_version: ""        # leave empty to use ldflags-injected version.Version
+
+# /metrics is always mounted at /metrics — not configurable.

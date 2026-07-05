@@ -72,7 +72,9 @@ There is **no env-var overlay** — YAML is the only source. Missing file is OK 
 
 ### OTel init
 
-`internal/otel/otel.go:Init` sets up TracerProvider + MeterProvider with OTLP HTTP exporters, using `semconv/v1.41.0` (must match the OTel SDK's bundled detectors — see SKILL.md trap #5). Returns `(nil, nil)` when `cfg.Enabled=false`. `cmd/server/main.go:run` defers `shutdownOTel` so exporter flush happens on signal.
+`internal/otel/otel.go:Init` sets up TracerProvider + MeterProvider with two MeterProvider readers: an OTLP HTTP periodic reader (push) and an OTel Prometheus exporter (pull, fed into `prometheus.DefaultRegisterer`). Uses `semconv/v1.41.0` (must match the OTel SDK's bundled detectors — see SKILL.md trap #5). Returns `(nil, nil)` when `cfg.Enabled=false`. `cmd/server/main.go:run` defers `shutdownOTel` so exporter flush happens on signal.
+
+When OTel is disabled, `/metrics` still serves Go runtime + process collectors (auto-registered by `prometheus/client_golang`'s `init`). When enabled, the same registry also carries OTel-translated app metrics (DB spans, gin server metrics, etc., depending on instrumentation wired in).
 
 ### DB (Gorm, opt-in)
 
@@ -87,6 +89,10 @@ For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — se
 Two separate probes in `internal/handler/health.go`:
 - `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
 - `GET /readyz` — **readiness**. 200 only when configured deps are reachable (currently: `db.PingContext`); 503 when `db==nil` or ping fails. Don't add expensive checks to `/healthz`.
+
+### /metrics
+
+`GET /metrics` is hardcoded in `cmd/server/main.go:newHTTPServer` and serves `promhttp.Handler()` from `prometheus.DefaultGatherer`. Always on, not configurable — it's an ops endpoint, not part of the API contract, and there's no good reason to disable it. Intentionally absent from `spec/openapi.yaml` so the client SDK doesn't carry a useless `GetMetrics*` method. Routed through the full middleware chain (otelgin + logging) — every scrape is traced and logged.
 
 ### Version injection
 
