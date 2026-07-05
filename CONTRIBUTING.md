@@ -75,6 +75,5 @@ before reporting.
 
 ## License
 
-By contributing you agree your changes will be licensed under the same terms
-as the rest of this repository (currently none — add a LICENSE file before
-publishing derivative projects).
+By contributing you agree your changes will be licensed under the [MIT
+License](LICENSE), the same terms as the rest of this repository.

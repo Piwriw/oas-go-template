@@ -1,5 +1,7 @@
 # oas-go-template
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A Go project template based on OpenAPI Specification (OAS) 3.x, using
 [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) to generate
 server stubs and client SDK from a single source of truth: `spec/openapi.yaml`.
@@ -111,4 +113,4 @@ For sqlite tests use `file::memory:?cache=shared` plus `max_open_conns: 1`
 
 ## License
 
-TBD
+[MIT](LICENSE) © piwriw
