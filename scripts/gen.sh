@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Generate server types, gin server stub, and client SDK from spec/openapi.yaml.
+# Generate server types, gin server stub, client SDK, and embedded OAS document from spec/openapi.yaml.
 # Outputs:
-#   internal/api/types.gen.go   (server-side types)
-#   internal/api/server.gen.go  (gin server + StrictServerInterface)
+#   internal/api/types.gen.go   (server-side types — data models)
+#   internal/api/spec.gen.go    (gin bindings + StrictServerInterface — the contract)
 #   pkg/api/types.gen.go        (client-side types)
 #   pkg/api/client.gen.go       (client SDK)
+#   pkg/api/spec.gen.go         (embedded OAS document — GetSpec / GetSpecJSON for runtime introspection)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -21,16 +22,19 @@ fi
 
 mkdir -p internal/api pkg/api
 
-echo "[1/4] generating internal/api/types.gen.go (models)"
+echo "[1/5] generating internal/api/types.gen.go (models)"
 oapi-codegen --config "$CONFIG" -generate models -o internal/api/types.gen.go -package api "$SPEC"
 
-echo "[2/4] generating internal/api/server.gen.go (gin-server + strict-server)"
-oapi-codegen --config "$CONFIG" -generate 'gin-server,strict-server' -o internal/api/server.gen.go -package api "$SPEC"
+echo "[2/5] generating internal/api/spec.gen.go (gin-server + strict-server)"
+oapi-codegen --config "$CONFIG" -generate 'gin-server,strict-server' -o internal/api/spec.gen.go -package api "$SPEC"
 
-echo "[3/4] generating pkg/api/types.gen.go (client-side models)"
+echo "[3/5] generating pkg/api/types.gen.go (client-side models)"
 oapi-codegen --config "$CONFIG" -generate models -o pkg/api/types.gen.go -package api "$SPEC"
 
-echo "[4/4] generating pkg/api/client.gen.go (client)"
+echo "[4/5] generating pkg/api/client.gen.go (client)"
 oapi-codegen --config "$CONFIG" -generate client -o pkg/api/client.gen.go -package api "$SPEC"
+
+echo "[5/5] generating pkg/api/spec.gen.go (embedded OAS document)"
+oapi-codegen --config "$CONFIG" -generate spec -o pkg/api/spec.gen.go -package api "$SPEC"
 
 echo "Done."

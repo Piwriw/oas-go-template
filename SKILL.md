@@ -115,7 +115,7 @@ This runs `scripts/gen.sh`, which calls `oapi-codegen` four times:
 | Output file | package | what |
 |-------------|---------|------|
 | `internal/api/types.gen.go` | `api` | server-side models |
-| `internal/api/server.gen.go` | `api` | gin handlers + `StrictServerInterface` |
+| `internal/api/spec.gen.go` | `api` | gin handlers + `StrictServerInterface` |
 | `pkg/api/types.gen.go` | `api` | client-side models (separate copy — `pkg/` cannot import `internal/`) |
 | `pkg/api/client.gen.go` | `api` | client SDK |
 
@@ -124,7 +124,7 @@ This runs `scripts/gen.sh`, which calls `oapi-codegen` four times:
 Look at the new interface:
 
 ```bash
-sed -n '/type StrictServerInterface/,/^}/p' internal/api/server.gen.go
+sed -n '/type StrictServerInterface/,/^}/p' internal/api/spec.gen.go
 ```
 
 For each method, write a file in `internal/handler/`. The Handler struct is already declared in `internal/handler/handler.go`. Method signature pattern:
@@ -135,7 +135,7 @@ func (h *Handler) GetFoo(ctx context.Context, req api.GetFooRequestObject) (api.
 }
 ```
 
-The response types are `GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc. — their names come from the status code + schema. **Do not invent response types; only use what's in `internal/api/server.gen.go`.**
+The response types are `GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc. — their names come from the status code + schema. **Do not invent response types; only use what's in `internal/api/spec.gen.go`.**
 
 Add a compile-time check so you can't forget a method:
 
@@ -283,7 +283,7 @@ generate:
   - models
   - gin-server
 output:
-  out: internal/api/server.gen.go
+  out: internal/api/spec.gen.go
 ```
 
 **Right** (v2):

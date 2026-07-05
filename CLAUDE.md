@@ -28,18 +28,19 @@ For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md i
 
 ## Architecture
 
-### OAS-driven codegen (4 outputs, one spec)
+### OAS-driven codegen (5 outputs, one spec)
 
-`scripts/gen.sh` invokes `oapi-codegen` four times against `spec/openapi.yaml`:
+`scripts/gen.sh` invokes `oapi-codegen` five times against `spec/openapi.yaml`:
 
 | Output | Package | Role |
 |--------|---------|------|
 | `internal/api/types.gen.go` | `api` | server-side models |
-| `internal/api/server.gen.go` | `api` | gin bindings + `StrictServerInterface` |
+| `internal/api/spec.gen.go` | `api` | gin bindings + `StrictServerInterface` |
 | `pkg/api/types.gen.go` | `api` | client-side models (separate copy — `pkg/` cannot import `internal/`) |
 | `pkg/api/client.gen.go` | `api` | client SDK |
+| `pkg/api/spec.gen.go` | `api` | embedded OAS document — `GetSpec()` / `GetSpecJSON()` for runtime introspection (e.g. serving `/openapi.json`, contract testing) |
 
-`pkg/` mirrors `internal/` because Go's import visibility prevents the public client from importing the server's types — both copies must exist.
+`pkg/` mirrors `internal/` because Go's import visibility prevents the public client from importing the server's types — both copies must exist. The embedded-spec file pulls in `github.com/getkin/kin-openapi` as a direct dep.
 
 **Never hand-edit `*.gen.go`.** They are committed (not gitignored) so reviewers and IDEs see what's compiled.
 
@@ -47,7 +48,7 @@ For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md i
 
 Handlers in `internal/handler/` implement `api.StrictServerInterface` — a generated interface where each method returns a typed `ResponseObject` (`GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc.). The constructor `api.NewStrictHandler(h, nil)` wraps them; `api.RegisterHandlers(r, strictHandler)` mounts them on gin. There is a compile-time check `var _ api.StrictServerInterface = (*Handler)(nil)` in `internal/handler/handler_test.go` so missing methods fail the build.
 
-Response type names come from the OAS status code + schema — **only use names that already exist in `internal/api/server.gen.go`**, never invent them.
+Response type names come from the OAS status code + schema — **only use names that already exist in `internal/api/spec.gen.go`**, never invent them.
 
 ### Request lifecycle and middleware ordering
 
