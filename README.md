@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+English | **[简体中文](README.zh-CN.md)**
+
 A Go project template where **`spec/openapi.yaml` is the single source of truth**.
 Server stubs and the client SDK are generated from it via
 [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) (StrictServerInterface
