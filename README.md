@@ -38,41 +38,48 @@ golangci-lint v2 config, and a Vite + React + TS frontend (deployed separately).
 
 ## Initialize a New Project from This Template
 
-The repo ships `scripts/init-project.sh`, a one-shot renamer that rewrites the
-module path and project name everywhere they appear (Go imports, Makefile,
-Dockerfile, golangci-lint config, Helm chart, README/CLAUDE/CONTRIBUTING
-titles). It also re-runs `make gen` so the generated code matches the new
-package.
+The repo ships `scripts/init-project.sh`, a one-shot renamer. The fastest
+path is to hand the procedure below to an AI coding agent (Claude Code,
+Cursor, Cline, etc.) — it will drive the script, ask for the values it
+can't infer, and verify the result.
 
-```bash
-# 1. Copy the template to where your new project lives
-cp -r /path/to/oas-go-template ./my-project
-cd my-project
-rm -rf .git bin client && git init && git branch -m main
+Copy the prompt below, fill in (or leave for the agent to ask), and paste
+it into your AI tool:
 
-# 2. Run the renamer with your module path
-./scripts/init-project.sh github.com/yourorg/my-project
+````markdown
+Initialize a new Go project from the oas-go-template.
 
-# 3. (Manual) Set chart image repos + author/copyright — script prints what's left
-#    Open chart/values.yaml and edit server.image.repository / web.image.repository.
-#    Edit README.md (© line) and chart/Chart.yaml (maintainers).
+Inputs (ask me for any that are missing before you start):
+- TEMPLATE_PATH : path to a clone of github.com/piwriw/oas-go-template
+- TARGET_PATH   : where the new project should live
+- MODULE_PATH   : e.g. github.com/yourorg/my-project
+- SHORT_NAME    : optional; defaults to the last segment of MODULE_PATH
 
-# 4. Verify
-make build test lint
-```
+Procedure:
+1. cp -r "$TEMPLATE_PATH" "$TARGET_PATH"
+2. cd "$TARGET_PATH"
+3. rm -rf .git bin client && git init -q && git branch -m main
+4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
+5. The script will print a "Manual follow-ups" block. Handle each:
+   a. chart/values.yaml — ask me for the image registry/repo and update
+      server.image.repository and web.image.repository accordingly.
+   b. README.md © line and chart/Chart.yaml maintainers — ask me for
+      author info and update.
+6. Verify the result, in this order:
+   - golangci-lint config verify    # must pass with no output
+   - make gen                       # should produce no diff
+   - make build test lint           # all green
+7. Report a one-paragraph summary: what changed, what's left for me to do
+   (e.g. "edit spec/openapi.yaml to define your API, then make gen again").
 
-The script derives the OLD module path from `go.mod` — no hard-coded
-`"oas-go-template"` string — so it's safe to re-run and won't match itself.
-Pass a second arg to override the short name (defaults to the last segment of
-the module path):
+Read SKILL.md for the full map of what the renamer touches, what it skips,
+and the configuration traps to watch for. Do not proceed past step 4
+without my confirmation on the registry and author values.
+````
 
-```bash
-./scripts/init-project.sh github.com/yourorg/monorepo my-service
-```
-
-For the full walkthrough — what the script touches, what it skips, manual
-follow-ups, and a deep dive on every configuration trap that bit the original
-build — see **[SKILL.md](SKILL.md)**.
+Want to run it by hand instead? See `./scripts/init-project.sh --help` and
+**[SKILL.md](SKILL.md)** for the underlying commands and the full
+walkthrough.
 
 ## Quickstart
 

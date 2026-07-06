@@ -32,32 +32,42 @@
 
 ## 从模板初始化新项目
 
-仓库自带 `scripts/init-project.sh`——一个一键重命名脚本，会把模块路径和项目名同步替换到所有出现位置（Go import、Makefile、Dockerfile、golangci-lint 配置、Helm chart、README/CLAUDE/CONTRIBUTING 标题），并自动跑一次 `make gen` 让生成代码与新包名匹配。
+仓库自带 `scripts/init-project.sh`——一键重命名脚本。最快的路径是把下面的流程交给 AI 编码代理（Claude Code、Cursor、Cline 等），它会驱动脚本、追问无法推断的值、并验证结果。
 
-```bash
-# 1. 把模板复制到新项目目录
-cp -r /path/to/oas-go-template ./my-project
-cd my-project
-rm -rf .git bin client && git init && git branch -m main
+复制下面的 prompt，填好变量（或留空让 AI 来问），粘贴到你的 AI 工具里：
 
-# 2. 用你的模块路径跑重命名脚本
-./scripts/init-project.sh github.com/yourorg/my-project
+````markdown
+帮我从 oas-go-template 派生一个新的 Go 项目。
 
-# 3. （手动）设置 chart 的 image repos 和作者署名 —— 脚本会提示哪些没自动改
-#    打开 chart/values.yaml，编辑 server.image.repository / web.image.repository。
-#    编辑 README.md（© 行）和 chart/Chart.yaml（maintainers）。
+输入参数（缺哪个就先问我哪个，问完再开始执行）：
+- TEMPLATE_PATH : 已 clone 的 github.com/piwriw/oas-go-template 路径
+- TARGET_PATH   : 新项目要放的位置
+- MODULE_PATH   : 例如 github.com/yourorg/my-project
+- SHORT_NAME    : 可选；默认取 MODULE_PATH 的最后一段
 
-# 4. 验证
-make build test lint
-```
+执行步骤：
+1. cp -r "$TEMPLATE_PATH" "$TARGET_PATH"
+2. cd "$TARGET_PATH"
+3. rm -rf .git bin client && git init -q && git branch -m main
+4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
+5. 脚本会输出一段 "Manual follow-ups"。逐条处理：
+   a. chart/values.yaml —— 问我镜像仓库地址，更新 server.image.repository
+      和 web.image.repository。
+   b. README.md 的 © 行、chart/Chart.yaml 的 maintainers —— 问我作者署名，
+      替换掉 piwriw。
+6. 按顺序验证：
+   - golangci-lint config verify    # 应无任何输出
+   - make gen                       # 应无 diff
+   - make build test lint           # 全部绿
+7. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
+   定义你的 API，再跑一次 make gen"）。
 
-脚本从 `go.mod` 推导旧模块路径——**不写死 `"oas-go-template"`**——所以可以安全重复执行，也不会误伤自己。需要覆盖短名时传第二个参数（默认取模块路径的最后一段）：
+执行前请阅读 SKILL.md，了解重命名脚本改了哪些位置、跳过了哪些、以及所有
+要避开的配置陷阱。第 4 步之后、第 5 步之前，必须等我确认 registry 和
+author 的值再继续。
+````
 
-```bash
-./scripts/init-project.sh github.com/yourorg/monorepo my-service
-```
-
-完整流程——脚本改了什么、跳过了什么、需要手动补什么、以及原版构建中踩过的每一个配置陷阱，请看 **[SKILL.md](SKILL.md)**。
+想手动执行？看 `./scripts/init-project.sh --help` 和 **[SKILL.md](SKILL.md)** 里的底层命令与完整流程。
 
 ## 快速开始
 
