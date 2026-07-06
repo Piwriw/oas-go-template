@@ -33,7 +33,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     ./cmd/server
 
 # Runtime stage
-FROM alpine:3.20
+FROM alpine:3.24
 
 # ca-certificates for HTTPS calls, tzdata for time zone support
 RUN apk --no-cache add ca-certificates tzdata
