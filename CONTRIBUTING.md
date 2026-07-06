@@ -53,6 +53,27 @@ chore(deps): bump otel to v1.41.0
 These prefixes feed release notes and any future automated tooling, so
 consistency matters.
 
+## Sign-off (DCO)
+
+Every commit must carry a `Signed-off-by:` trailer — this is your
+attestation to the [Developer Certificate of Origin](https://developercertificate.org/)
+that you wrote the change and have the right to contribute it.
+
+```bash
+git commit -s   # or --signoff — adds the trailer using git config user.name / user.email
+```
+
+The CI `Sign-off Check (DCO)` job rejects any PR commit missing the
+trailer. To fix existing commits:
+
+```bash
+git rebase --signoff origin/main
+git push --force-with-lease
+```
+
+The trailer takes the form `Signed-off-by: Your Name <you@example.com>`
+and must match your git identity.
+
 ## PR checklist
 
 - [ ] `make lint test audit` passes locally
@@ -61,6 +82,7 @@ consistency matters.
 - [ ] No secrets, real DSNs, or customer data in commits
 - [ ] If you changed `spec/openapi.yaml`, the regenerated `*.gen.go` are
       committed in the same PR
+- [ ] Every commit has a `Signed-off-by:` trailer (see [Sign-off (DCO)](#sign-off-dco))
 
 ## Reporting bugs
 

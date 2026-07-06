@@ -15,6 +15,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dco:
+    name: Sign-off Check (DCO)
+    runs-on: ubuntu-latest
+    # Only PRs need this — direct pushes to main have already been reviewed.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # Need every commit in the PR, not just the head.
+
+      - name: Verify each commit carries a Signed-off-by trailer
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.event.pull_request.base.ref }}"
+          commits=$(git rev-list --no-merges "$base..HEAD")
+          if [ -z "$commits" ]; then
+            echo "No commits to check (empty PR?)."
+            exit 0
+          fi
+          fail=0
+          for sha in $commits; do
+            subject=$(git log -1 --format='%h %s' "$sha")
+            if ! git log -1 --format='%B' "$sha" | grep -qE '^Signed-off-by: .+ <[^[:space:]]+@[^[:space:]]+>'; then
+              echo "::error::Missing Signed-off-by on $subject"
+              fail=1
+            fi
+          done
+          if [ "$fail" -eq 1 ]; then
+            echo
+            echo "Every commit needs a Signed-off-by trailer (Developer Certificate of Origin)."
+            echo "Fix existing commits with:"
+            echo "  git rebase --signoff $base"
+            echo "  git push --force-with-lease"
+            echo
+            echo "For new commits, use 'git commit -s' (or --signoff)."
+            exit 1
+          fi
+          echo "All commits in this PR are signed off."
+
   verify:
     name: Lint, test, audit
     runs-on: ubuntu-latest
