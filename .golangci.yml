@@ -24,9 +24,26 @@ linters:
     - unconvert        # useless type conversions like `string(s)` where s is already string
     - unparam          # unused function parameters / return values
     - misspell
+    - forbidigo        # forbid specific calls — here, the legacy log package
   settings:
     gocyclo:
       min-complexity: 15   # default 30; Prometheus=10, Kubernetes=20 — pick a middle ground
+    forbidigo:
+      # analyze-types resolves the full package path of each identifier so we
+      # can write patterns like '^log\.Printf$' instead of bare ident names.
+      # Without it, forbidigo matches ident-by-ident and 'log\.Printf' never
+      # hits (the ident is just 'Printf' at that layer).
+      analyze-types: true
+      forbid:
+        # Use log/slog (structured) instead of the legacy log package.
+        # Anchored patterns match the full qualified selector; slog.X is a
+        # different package path and is unaffected.
+        - pattern: '^log\.Print(ln|f)?$'
+          msg: "use log/slog for structured logging; see internal/logging"
+        - pattern: '^log\.Fatal(ln|f)?$'
+          msg: "use log/slog for structured logging; see internal/logging"
+        - pattern: '^log\.Panic(ln|f)?$'
+          msg: "use log/slog for structured logging; see internal/logging"
 
 issues:
   exclude-rules:

@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -14,7 +14,8 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("client: %v", err)
+		slog.Error("client exiting", "err", err)
+		os.Exit(1)
 	}
 }
 
@@ -46,8 +47,7 @@ func run() error {
 		fmt.Printf("health: status=%s version=%s\n", resp.JSON200.Status, version)
 		return nil
 	case resp.JSON500 != nil:
-		fmt.Printf("health: unhealthy code=%d message=%s\n", resp.JSON500.Code, resp.JSON500.Message)
-		return nil
+		return fmt.Errorf("health: unhealthy code=%d message=%s", resp.JSON500.Code, resp.JSON500.Message)
 	default:
 		return fmt.Errorf("unexpected response (HTTP %d, body=%q): %w", resp.StatusCode(), string(resp.Body), errors.New("non-2xx"))
 	}
