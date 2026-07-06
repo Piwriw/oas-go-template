@@ -56,26 +56,33 @@ Inputs (ask me for any that are missing before you start):
 - TARGET_PATH   : where the new project should live
 - MODULE_PATH   : e.g. github.com/yourorg/my-project
 - SHORT_NAME    : optional; defaults to the last segment of MODULE_PATH
+- GITHUB_HOSTED : yes / no — will this project live on GitHub.com?
+                  no  → delete .github/ (CI workflow, Dependabot, issue
+                         templates, security-advisory URL all assume GitHub).
 
 Procedure:
 1. git clone https://github.com/piwriw/oas-go-template.git "$TARGET_PATH"
 2. cd "$TARGET_PATH"
 3. rm -rf .git bin client && git init -q && git branch -m main
 4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
-5. The script will print a "Manual follow-ups" block. Handle each:
+5. If GITHUB_HOSTED != yes: rm -rf .github/
+   (Otherwise leave it. The renamer has already rewritten every
+   github.com/piwriw/oas-go-template URL inside .github/ to point at the
+   new module path, so CI / Dependabot / issue templates keep working.)
+6. The script will print a "Manual follow-ups" block. Handle each:
    a. chart/values.yaml — ask me for the image registry/repo and update
       server.image.repository and web.image.repository accordingly.
    b. README.md © line and chart/Chart.yaml maintainers — ask me for
       author info and update.
-6. Verify the result, in this order:
+7. Verify the result, in this order:
    - golangci-lint config verify    # must pass with no output
    - make gen                       # should produce no diff
    - make build test lint           # all green
-7. Report a one-paragraph summary: what changed, what's left for me to do
+8. Report a one-paragraph summary: what changed, what's left for me to do
    (e.g. "edit spec/openapi.yaml to define your API, then make gen again").
 
 Read SKILL.md for the full map of what the renamer touches, what it skips,
-and the configuration traps to watch for. Do not proceed past step 4
+and the configuration traps to watch for. Do not proceed past step 6
 without my confirmation on the registry and author values.
 ````
 

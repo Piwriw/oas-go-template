@@ -46,26 +46,32 @@
 - TARGET_PATH   : 新项目要放的位置
 - MODULE_PATH   : 例如 github.com/yourorg/my-project
 - SHORT_NAME    : 可选；默认取 MODULE_PATH 的最后一段
+- GITHUB_HOSTED : yes / no —— 新项目是否托管在 GitHub.com？
+                  no  → 删除 .github/（CI workflow、Dependabot、issue 模板、
+                         security advisory URL 全都依赖 GitHub）。
 
 执行步骤：
 1. git clone https://github.com/piwriw/oas-go-template.git "$TARGET_PATH"
 2. cd "$TARGET_PATH"
 3. rm -rf .git bin client && git init -q && git branch -m main
 4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
-5. 脚本会输出一段 "Manual follow-ups"。逐条处理：
+5. 如果 GITHUB_HOSTED != yes：rm -rf .github/
+   （否则保留。重命名脚本已经把 .github/ 里所有 github.com/piwriw/oas-go-template
+    的 URL 改写成新的模块路径，CI / Dependabot / issue 模板都能继续工作。）
+6. 脚本会输出一段 "Manual follow-ups"。逐条处理：
    a. chart/values.yaml —— 问我镜像仓库地址，更新 server.image.repository
       和 web.image.repository。
    b. README.md 的 © 行、chart/Chart.yaml 的 maintainers —— 问我作者署名，
       替换掉 piwriw。
-6. 按顺序验证：
+7. 按顺序验证：
    - golangci-lint config verify    # 应无任何输出
    - make gen                       # 应无 diff
    - make build test lint           # 全部绿
-7. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
+8. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
    定义你的 API，再跑一次 make gen"）。
 
 执行前请阅读 SKILL.md，了解重命名脚本改了哪些位置、跳过了哪些、以及所有
-要避开的配置陷阱。第 4 步之后、第 5 步之前，必须等我确认 registry 和
+要避开的配置陷阱。第 6 步之后、第 7 步之前，必须等我确认 registry 和
 author 的值再继续。
 ````
 
