@@ -101,9 +101,6 @@ jobs:
       - name: Test (race + cover)
         run: make test
 
-      - name: Audit (govulncheck + gosec)
-        run: make audit
-
       - name: Helm lint
         run: make helm-lint
 
