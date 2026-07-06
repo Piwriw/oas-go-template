@@ -1,0 +1,32 @@
+version: 2
+
+# Dependabot keeps direct + indirect deps, GitHub Actions, and the Docker
+# base images fresh. Derived projects inherit this config unchanged.
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(ci)
+      include: scope
+
+  - package-ecosystem: docker
+    directory: /build
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+      include: scope
