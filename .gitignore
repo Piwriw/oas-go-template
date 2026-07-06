@@ -1,6 +1,10 @@
 # Binaries
 /bin/
 /dist/
+# Bare `go build ./cmd/server` / `go build ./cmd/client` from repo root drops
+# `server` / `client` binaries in . — use `make build` to put them under bin/.
+/server
+/client
 *.exe
 *.exe~
 *.dll
