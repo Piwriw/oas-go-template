@@ -40,13 +40,12 @@
 帮我从 oas-go-template 派生一个新的 Go 项目。
 
 输入参数（缺哪个就先问我哪个，问完再开始执行）：
-- TEMPLATE_PATH : 已 clone 的 github.com/piwriw/oas-go-template 路径
 - TARGET_PATH   : 新项目要放的位置
 - MODULE_PATH   : 例如 github.com/yourorg/my-project
 - SHORT_NAME    : 可选；默认取 MODULE_PATH 的最后一段
 
 执行步骤：
-1. cp -r "$TEMPLATE_PATH" "$TARGET_PATH"
+1. git clone https://github.com/piwriw/oas-go-template.git "$TARGET_PATH"
 2. cd "$TARGET_PATH"
 3. rm -rf .git bin client && git init -q && git branch -m main
 4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"

@@ -50,13 +50,12 @@ it into your AI tool:
 Initialize a new Go project from the oas-go-template.
 
 Inputs (ask me for any that are missing before you start):
-- TEMPLATE_PATH : path to a clone of github.com/piwriw/oas-go-template
 - TARGET_PATH   : where the new project should live
 - MODULE_PATH   : e.g. github.com/yourorg/my-project
 - SHORT_NAME    : optional; defaults to the last segment of MODULE_PATH
 
 Procedure:
-1. cp -r "$TEMPLATE_PATH" "$TARGET_PATH"
+1. git clone https://github.com/piwriw/oas-go-template.git "$TARGET_PATH"
 2. cd "$TARGET_PATH"
 3. rm -rf .git bin client && git init -q && git branch -m main
 4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
