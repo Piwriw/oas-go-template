@@ -1,5 +1,8 @@
 # oas-go-template
 
+[![CI](https://github.com/piwriw/oas-go-template/actions/workflows/ci.yml/badge.svg)](https://github.com/piwriw/oas-go-template/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/piwriw/oas-go-template)](https://goreportcard.com/report/github.com/piwriw/oas-go-template)
+[![Go Reference](https://pkg.go.dev/badge/github.com/piwriw/oas-go-template.svg)](https://pkg.go.dev/github.com/piwriw/oas-go-template)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 English | **[简体中文](README.zh-CN.md)**

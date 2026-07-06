@@ -50,7 +50,8 @@ docs: clarify config loading order
 chore(deps): bump otel to v1.41.0
 ```
 
-Goreleaser filters the changelog by these prefixes, so consistency matters.
+These prefixes feed release notes and any future automated tooling, so
+consistency matters.
 
 ## PR checklist
 
@@ -69,8 +70,9 @@ reproduces the issue.
 
 ## Security disclosures
 
-**Do not file a public issue for security vulnerabilities.** Email the
-maintainer directly instead. Run `make audit` locally to confirm a finding
+**Do not file a public issue for security vulnerabilities.** See
+[SECURITY.md](SECURITY.md) for the private reporting channel
+(GitHub Security Advisory). Run `make audit` locally to confirm a finding
 before reporting.
 
 ## License
