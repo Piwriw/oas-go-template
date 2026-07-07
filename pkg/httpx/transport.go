@@ -1,8 +1,10 @@
 package httpx
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -86,4 +88,84 @@ func (t traceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		span.SetStatus(codes.Ok, "")
 	}
 	return resp, nil
+}
+
+// retryTransport wraps an inner transport and retries failed attempts
+// per the configured RetryPolicy. It is the outermost transport in the
+// chain so each retry gets its own trace span and log entry.
+type retryTransport struct {
+	parent http.RoundTripper
+	policy RetryPolicy
+}
+
+func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Zero-value policy → no retry, just one attempt through the parent.
+	if t.policy.MaxAttempts <= 0 {
+		return t.parent.RoundTrip(req)
+	}
+
+	var lastResp *http.Response
+	var lastErr error
+
+	for attempt := 0; attempt < t.policy.MaxAttempts; attempt++ {
+		// For retries we must send a fresh body. GetBody is set by Do[T]/DoVoid.
+		if attempt > 0 {
+			if req.GetBody != nil {
+				newReq, err := req.GetBody()
+				if err != nil {
+					lastErr = err
+					break
+				}
+				req.Body = newReq
+			}
+		}
+
+		resp, err := t.parent.RoundTrip(req)
+		lastResp, lastErr = resp, err
+
+		status := 0
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		if !t.policy.shouldRetry(req.Method, status, err) {
+			return resp, err
+		}
+
+		// Drain body so the connection can be reused.
+		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
+
+		wait := t.policy.backoff(attempt)
+		// Honor Retry-After on 429 / 503 if present (overrides backoff).
+		if resp != nil {
+			if ra := parseRetryAfter(resp.Header.Get("Retry-After")); ra > 0 {
+				wait = ra
+			}
+		}
+
+		select {
+		case <-req.Context().Done():
+			lastErr = req.Context().Err()
+			return nil, lastErr
+		case <-time.After(wait):
+		}
+	}
+	return lastResp, lastErr
+}
+
+// parseRetryAfter parses the Retry-After header, which can be either
+// delta-seconds or an HTTP-date. Returns 0 if unparseable.
+func parseRetryAfter(v string) time.Duration {
+	if v == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(v); err == nil {
+		return time.Duration(secs) * time.Second
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		return time.Until(t)
+	}
+	return 0
 }

@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
@@ -232,5 +234,148 @@ func TestTraceTransport_5xxMarksError(t *testing.T) {
 	}
 	if spans[0].Status.Code != codes.Error {
 		t.Errorf("want span status Error, got %v", spans[0].Status.Code)
+	}
+}
+
+func TestRetryTransport_RetriesOn5xxThenSucceeds(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&calls, 1)
+		if n < 2 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
+	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+	if calls != 2 {
+		t.Errorf("calls = %d, want 2", calls)
+	}
+}
+
+func TestRetryTransport_DoesNotRetryOn4xx(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
+	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", resp.StatusCode)
+	}
+	if calls != 1 {
+		t.Errorf("calls = %d, want 1 (no retry on 4xx)", calls)
+	}
+}
+
+func TestRetryTransport_DoesNotRetryOnPOST(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
+	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL, nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer resp.Body.Close()
+	if calls != 1 {
+		t.Errorf("calls = %d, want 1 (no retry on POST)", calls)
+	}
+}
+
+func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
+	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer resp.Body.Close()
+	if calls != 3 {
+		t.Errorf("calls = %d, want 3", calls)
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", resp.StatusCode)
+	}
+}
+
+func TestRetryTransport_ContextCancelStopsRetries(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	policy := RetryPolicy{MaxAttempts: 10, Initial: 50 * time.Millisecond, Max: 50 * time.Millisecond, Multiplier: 1, Jitter: 0}
+	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
+
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	_, err := rt.RoundTrip(req)
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("want error from canceled request")
+	}
+	if elapsed > 30*time.Millisecond {
+		t.Errorf("cancel didn't short-circuit backoff; elapsed = %v", elapsed)
+	}
+}
+
+func TestRetryTransport_RetriesOnNetworkError(t *testing.T) {
+	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
+	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	_, err := rt.RoundTrip(req)
+	if err == nil {
+		t.Fatal("want error")
 	}
 }
