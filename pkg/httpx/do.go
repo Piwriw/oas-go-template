@@ -68,7 +68,7 @@ func Do[T any](ctx context.Context, c *Client, method, url string, body any) (*T
 	if err != nil {
 		return nil, fmt.Errorf("httpx: send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -132,7 +132,7 @@ func DoVoid(ctx context.Context, c *Client, method, url string, body any) (*http
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return resp, &httpError{
 			method:     method,
 			url:        fullURL,
@@ -144,7 +144,7 @@ func DoVoid(ctx context.Context, c *Client, method, url string, body any) (*http
 	// Drain body so the connection returns to the pool, but keep resp
 	// usable to callers (header inspection). Body is closed.
 	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(nil))
 	return resp, nil
 }

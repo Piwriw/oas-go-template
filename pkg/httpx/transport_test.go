@@ -3,6 +3,7 @@ package httpx
 import (
 	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -25,8 +26,19 @@ func newTestLogger() (*slog.Logger, *bytes.Buffer) {
 	return slog.New(h), &buf
 }
 
+// closeBody silences bodyclose/errcheck on responses whose body we don't
+// otherwise read in a test.
+func closeBody(t *testing.T, resp *http.Response) {
+	t.Helper()
+	if resp == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
 func TestLogTransport_2xx_Info(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -39,7 +51,7 @@ func TestLogTransport_2xx_Info(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	out := buf.String()
 	if !strings.Contains(out, "level=INFO") {
@@ -54,7 +66,7 @@ func TestLogTransport_2xx_Info(t *testing.T) {
 }
 
 func TestLogTransport_4xx_Warn(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
@@ -67,7 +79,7 @@ func TestLogTransport_4xx_Warn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	out := buf.String()
 	if !strings.Contains(out, "level=WARN") {
@@ -76,7 +88,7 @@ func TestLogTransport_4xx_Warn(t *testing.T) {
 }
 
 func TestLogTransport_5xx_Warn(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer srv.Close()
@@ -89,7 +101,7 @@ func TestLogTransport_5xx_Warn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	out := buf.String()
 	if !strings.Contains(out, "level=WARN") {
@@ -106,7 +118,8 @@ func TestLogTransport_NetworkError_Error(t *testing.T) {
 
 	// Port 1 dials → connection refused → transport error.
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:1", nil)
-	_, err := rt.RoundTrip(req)
+	resp, err := rt.RoundTrip(req)
+	closeBody(t, resp)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -121,7 +134,7 @@ func TestLogTransport_NetworkError_Error(t *testing.T) {
 }
 
 func TestLogTransport_ElapsedAndMethodRecorded(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -134,7 +147,7 @@ func TestLogTransport_ElapsedAndMethodRecorded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	out := buf.String()
 	if !strings.Contains(out, "method=POST") {
@@ -167,11 +180,10 @@ func TestTraceTransport_CreatesSpanAndInjectsHeaders(t *testing.T) {
 
 	var gotHeaders http.Header
 	var mu sync.Mutex
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		gotHeaders = r.Header.Clone()
 		mu.Unlock()
-		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
@@ -188,7 +200,7 @@ func TestTraceTransport_CreatesSpanAndInjectsHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	spans := exp.GetSpans()
 	if len(spans) != 1 {
@@ -208,7 +220,7 @@ func TestTraceTransport_5xxMarksError(t *testing.T) {
 	tp := newTracerProviderWithExporter(exp)
 	defer func() { _ = tp.Shutdown(context.Background()) }()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer srv.Close()
@@ -226,7 +238,7 @@ func TestTraceTransport_5xxMarksError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	spans := exp.GetSpans()
 	if len(spans) != 1 {
@@ -239,7 +251,7 @@ func TestTraceTransport_5xxMarksError(t *testing.T) {
 
 func TestRetryTransport_RetriesOn5xxThenSucceeds(t *testing.T) {
 	var calls int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		n := atomic.AddInt32(&calls, 1)
 		if n < 2 {
 			w.WriteHeader(http.StatusBadGateway)
@@ -257,7 +269,7 @@ func TestRetryTransport_RetriesOn5xxThenSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want 200", resp.StatusCode)
 	}
@@ -268,7 +280,7 @@ func TestRetryTransport_RetriesOn5xxThenSucceeds(t *testing.T) {
 
 func TestRetryTransport_DoesNotRetryOn4xx(t *testing.T) {
 	var calls int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -282,7 +294,7 @@ func TestRetryTransport_DoesNotRetryOn4xx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", resp.StatusCode)
 	}
@@ -293,7 +305,7 @@ func TestRetryTransport_DoesNotRetryOn4xx(t *testing.T) {
 
 func TestRetryTransport_DoesNotRetryOnPOST(t *testing.T) {
 	var calls int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		w.WriteHeader(http.StatusBadGateway)
 	}))
@@ -307,7 +319,7 @@ func TestRetryTransport_DoesNotRetryOnPOST(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if calls != 1 {
 		t.Errorf("calls = %d, want 1 (no retry on POST)", calls)
 	}
@@ -315,7 +327,7 @@ func TestRetryTransport_DoesNotRetryOnPOST(t *testing.T) {
 
 func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
 	var calls int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -329,7 +341,7 @@ func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RoundTrip err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if calls != 3 {
 		t.Errorf("calls = %d, want 3", calls)
 	}
@@ -339,7 +351,7 @@ func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
 }
 
 func TestRetryTransport_ContextCancelStopsRetries(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
@@ -356,7 +368,8 @@ func TestRetryTransport_ContextCancelStopsRetries(t *testing.T) {
 	}()
 
 	start := time.Now()
-	_, err := rt.RoundTrip(req)
+	resp, err := rt.RoundTrip(req)
+	closeBody(t, resp)
 	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatal("want error from canceled request")
@@ -370,11 +383,12 @@ func TestRetryTransport_RetriesOnNetworkError(t *testing.T) {
 	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
 	rt := retryTransport{parent: http.DefaultTransport, policy: policy}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	srv.Close()
 
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
-	_, err := rt.RoundTrip(req)
+	resp, err := rt.RoundTrip(req)
+	closeBody(t, resp)
 	if err == nil {
 		t.Fatal("want error")
 	}

@@ -51,7 +51,7 @@ func TestErrNon2xx_DoesNotMatchOtherErrors(t *testing.T) {
 }
 
 func TestDo_Get_Success(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(echoResp{Echoed: "hello"})
 	}))
@@ -68,7 +68,7 @@ func TestDo_Get_Success(t *testing.T) {
 }
 
 func TestDo_Get_204_NoBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
@@ -110,10 +110,8 @@ func TestDo_Post_RequestBody(t *testing.T) {
 
 func TestDo_Post_SetsContentType(t *testing.T) {
 	var gotCT string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		gotCT = r.Header.Get("Content-Type")
-		w.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(w, `{}`)
 	}))
 	defer srv.Close()
 
@@ -128,7 +126,7 @@ func TestDo_Post_SetsContentType(t *testing.T) {
 }
 
 func TestDo_Non2xx_ReturnsErrNon2xx(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = io.WriteString(w, `{"detail":"boom"}`)
 	}))
@@ -152,7 +150,7 @@ func TestDo_Non2xx_ReturnsErrNon2xx(t *testing.T) {
 
 func TestDo_NetworkError(t *testing.T) {
 	c := New()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	srv.Close()
 	_, err := Do[echoResp](context.Background(), c, http.MethodGet, srv.URL, nil)
 	if err == nil {
@@ -184,7 +182,7 @@ func TestDo_BaseURL_Joined(t *testing.T) {
 
 func TestDo_BodyTruncatedInError(t *testing.T) {
 	big := strings.Repeat("x", 5000)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = io.WriteString(w, big)
 	}))
@@ -201,7 +199,7 @@ func TestDo_BodyTruncatedInError(t *testing.T) {
 }
 
 func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-Foo", "bar")
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = io.WriteString(w, `{"ignored":true}`)
@@ -213,6 +211,7 @@ func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DoVoid err: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusAccepted {
 		t.Errorf("status = %d", resp.StatusCode)
 	}
@@ -226,13 +225,16 @@ func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
 }
 
 func TestDoVoid_Non2xx_ReturnsErrNon2xx(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer srv.Close()
 
 	c := New()
-	_, err := DoVoid(context.Background(), c, http.MethodPost, srv.URL, nil)
+	resp, err := DoVoid(context.Background(), c, http.MethodPost, srv.URL, nil)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if !errors.Is(err, ErrNon2xx) {
 		t.Errorf("want ErrNon2xx, got %v", err)
 	}

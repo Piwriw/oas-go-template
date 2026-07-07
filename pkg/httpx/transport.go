@@ -134,7 +134,7 @@ func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		// Drain body so the connection can be reused.
 		if resp != nil && resp.Body != nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		wait := t.policy.backoff(attempt)

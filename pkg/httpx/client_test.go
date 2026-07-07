@@ -33,12 +33,12 @@ func TestNew_CustomTransport_WrappedByChain(t *testing.T) {
 	srv := newOKServer(t)
 	defer srv.Close()
 
-	req, _ := http.NewRequest("GET", srv.URL, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 	resp, err := c.base.Do(req)
 	if err != nil {
 		t.Fatalf("Do err: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if custom.calls == 0 {
 		t.Errorf("custom transport not invoked")
 	}
@@ -53,7 +53,7 @@ func (t *countingTransport) RoundTrip(req *http.Request) (*http.Response, error)
 
 func newOKServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 }
@@ -141,23 +141,34 @@ func TestPut_Patch_Delete_Wrappers(t *testing.T) {
 }
 
 func TestPostVoid_Etc(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer srv.Close()
 
 	c := New()
 
-	if _, err := PostVoid(context.Background(), c, srv.URL, wrapper{Field: "x"}); err != nil {
+	resp, err := PostVoid(context.Background(), c, srv.URL, wrapper{Field: "x"})
+	if err != nil {
 		t.Fatalf("PostVoid err: %v", err)
 	}
-	if _, err := PutVoid(context.Background(), c, srv.URL, wrapper{Field: "x"}); err != nil {
+	defer func() { _ = resp.Body.Close() }()
+
+	resp, err = PutVoid(context.Background(), c, srv.URL, wrapper{Field: "x"})
+	if err != nil {
 		t.Fatalf("PutVoid err: %v", err)
 	}
-	if _, err := PatchVoid(context.Background(), c, srv.URL, wrapper{Field: "x"}); err != nil {
+	defer func() { _ = resp.Body.Close() }()
+
+	resp, err = PatchVoid(context.Background(), c, srv.URL, wrapper{Field: "x"})
+	if err != nil {
 		t.Fatalf("PatchVoid err: %v", err)
 	}
-	if _, err := DeleteVoid(context.Background(), c, srv.URL); err != nil {
+	defer func() { _ = resp.Body.Close() }()
+
+	resp, err = DeleteVoid(context.Background(), c, srv.URL)
+	if err != nil {
 		t.Fatalf("DeleteVoid err: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 }
