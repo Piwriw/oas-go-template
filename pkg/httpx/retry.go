@@ -3,6 +3,8 @@
 package httpx
 
 import (
+	"context"
+	"errors"
 	"math/rand/v2"
 	"time"
 )
@@ -61,4 +63,35 @@ func (p RetryPolicy) backoff(attempt int) time.Duration {
 		d = d - delta + 2*delta*rand.Float64()
 	}
 	return time.Duration(d)
+}
+
+// shouldRetry reports whether a failed attempt should be retried.
+//
+// Rules (all must hold):
+//   - policy is non-zero (MaxAttempts > 0)
+//   - method is GET, HEAD, PUT, or DELETE (idempotent)
+//   - status is 408, 429, 502, 503, 504, OR err is a non-context network error
+//
+// Context cancellation / deadline never retries — caller wanted to give up.
+func (p RetryPolicy) shouldRetry(method string, status int, err error) bool {
+	if p.MaxAttempts <= 0 {
+		return false
+	}
+	switch method {
+	case "GET", "HEAD", "PUT", "DELETE":
+		// idempotent — ok
+	default:
+		return false
+	}
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return false
+		}
+		return true
+	}
+	switch status {
+	case 408, 429, 502, 503, 504:
+		return true
+	}
+	return false
 }

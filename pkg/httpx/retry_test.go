@@ -1,6 +1,8 @@
 package httpx
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -64,5 +66,71 @@ func TestRetryPolicy_Backoff_ZeroPolicy(t *testing.T) {
 	var p RetryPolicy
 	if got := p.backoff(0); got != 0 {
 		t.Errorf("zero-value backoff = %v, want 0", got)
+	}
+}
+
+func TestShouldRetry_ByMethod(t *testing.T) {
+	p := DefaultRetry()
+	cases := []struct {
+		method string
+		want   bool
+	}{
+		{"GET", true},
+		{"HEAD", true},
+		{"PUT", true},
+		{"DELETE", true},
+		{"POST", false},  // non-idempotent
+		{"PATCH", false}, // non-idempotent
+		{"BREW", false},  // unknown → safe default: no retry
+	}
+	for _, c := range cases {
+		got := p.shouldRetry(c.method, 503, nil)
+		if got != c.want {
+			t.Errorf("shouldRetry(method=%s) = %v, want %v", c.method, got, c.want)
+		}
+	}
+}
+
+func TestShouldRetry_ByStatus(t *testing.T) {
+	p := DefaultRetry()
+	// Per spec §4: only 408, 429, 502, 503, 504 retry. NOT 500.
+	retryStatuses := []int{408, 429, 502, 503, 504}
+	noRetryStatuses := []int{200, 301, 400, 401, 403, 404, 422, 500}
+	for _, s := range retryStatuses {
+		if !p.shouldRetry("GET", s, nil) {
+			t.Errorf("status %d: want retry", s)
+		}
+	}
+	for _, s := range noRetryStatuses {
+		if p.shouldRetry("GET", s, nil) {
+			t.Errorf("status %d: want no retry", s)
+		}
+	}
+}
+
+func TestShouldRetry_ByError(t *testing.T) {
+	p := DefaultRetry()
+
+	// Simulated network error (not context-related) → retry.
+	netErr := errors.New("connection reset")
+	if !p.shouldRetry("GET", 0, netErr) {
+		t.Errorf("network error: want retry")
+	}
+
+	// context.Canceled → do NOT retry.
+	if p.shouldRetry("GET", 0, context.Canceled) {
+		t.Errorf("context.Canceled: want no retry")
+	}
+
+	// context.DeadlineExceeded → do NOT retry.
+	if p.shouldRetry("GET", 0, context.DeadlineExceeded) {
+		t.Errorf("context.DeadlineExceeded: want no retry")
+	}
+}
+
+func TestShouldRetry_ZeroPolicy(t *testing.T) {
+	var p RetryPolicy
+	if p.shouldRetry("GET", 503, nil) {
+		t.Errorf("zero-value policy: want no retry")
 	}
 }
