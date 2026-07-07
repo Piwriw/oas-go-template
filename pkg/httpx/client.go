@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -47,4 +48,49 @@ func New(opts ...Option) *Client {
 		c.base.Timeout = c.timeout
 	}
 	return c
+}
+
+// Get issues a GET and decodes the JSON response into *T.
+func Get[T any](ctx context.Context, c *Client, url string) (*T, error) {
+	return Do[T](ctx, c, http.MethodGet, url, nil)
+}
+
+// Post issues a POST with a JSON body and decodes the JSON response into *T.
+func Post[T any](ctx context.Context, c *Client, url string, body any) (*T, error) {
+	return Do[T](ctx, c, http.MethodPost, url, body)
+}
+
+// Put issues a PUT with a JSON body and decodes the JSON response into *T.
+func Put[T any](ctx context.Context, c *Client, url string, body any) (*T, error) {
+	return Do[T](ctx, c, http.MethodPut, url, body)
+}
+
+// Patch issues a PATCH with a JSON body and decodes the JSON response into *T.
+func Patch[T any](ctx context.Context, c *Client, url string, body any) (*T, error) {
+	return Do[T](ctx, c, http.MethodPatch, url, body)
+}
+
+// Delete issues a DELETE and decodes the JSON response into *T.
+func Delete[T any](ctx context.Context, c *Client, url string) (*T, error) {
+	return Do[T](ctx, c, http.MethodDelete, url, nil)
+}
+
+// PostVoid is like Post but does not decode the response body.
+func PostVoid(ctx context.Context, c *Client, url string, body any) (*http.Response, error) {
+	return DoVoid(ctx, c, http.MethodPost, url, body)
+}
+
+// PutVoid is like Put but does not decode the response body.
+func PutVoid(ctx context.Context, c *Client, url string, body any) (*http.Response, error) {
+	return DoVoid(ctx, c, http.MethodPut, url, body)
+}
+
+// PatchVoid is like Patch but does not decode the response body.
+func PatchVoid(ctx context.Context, c *Client, url string, body any) (*http.Response, error) {
+	return DoVoid(ctx, c, http.MethodPatch, url, body)
+}
+
+// DeleteVoid is like Delete but does not decode the response body.
+func DeleteVoid(ctx context.Context, c *Client, url string) (*http.Response, error) {
+	return DoVoid(ctx, c, http.MethodDelete, url, nil)
 }
