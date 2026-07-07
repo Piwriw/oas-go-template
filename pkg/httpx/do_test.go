@@ -199,3 +199,41 @@ func TestDo_BodyTruncatedInError(t *testing.T) {
 		t.Errorf("err msg too long (%d chars) — body not truncated", len(err.Error()))
 	}
 }
+
+func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Foo", "bar")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = io.WriteString(w, `{"ignored":true}`)
+	}))
+	defer srv.Close()
+
+	c := New()
+	resp, err := DoVoid(context.Background(), c, http.MethodPost, srv.URL, map[string]any{"k": "v"})
+	if err != nil {
+		t.Fatalf("DoVoid err: %v", err)
+	}
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("status = %d", resp.StatusCode)
+	}
+	if resp.Header.Get("X-Foo") != "bar" {
+		t.Errorf("X-Foo header missing")
+	}
+	n, _ := io.ReadAll(resp.Body)
+	if len(n) != 0 {
+		t.Errorf("body not drained: %d bytes left", len(n))
+	}
+}
+
+func TestDoVoid_Non2xx_ReturnsErrNon2xx(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	c := New()
+	_, err := DoVoid(context.Background(), c, http.MethodPost, srv.URL, nil)
+	if !errors.Is(err, ErrNon2xx) {
+		t.Errorf("want ErrNon2xx, got %v", err)
+	}
+}
