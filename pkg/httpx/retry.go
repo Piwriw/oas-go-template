@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"math/rand/v2"
+	"net/http"
 	"time"
 )
 
@@ -78,7 +79,7 @@ func (p RetryPolicy) shouldRetry(method string, status int, err error) bool {
 		return false
 	}
 	switch method {
-	case "GET", "HEAD", "PUT", "DELETE":
+	case http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete:
 		// idempotent — ok
 	default:
 		return false
