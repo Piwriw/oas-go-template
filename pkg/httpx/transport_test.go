@@ -7,7 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func newTestLogger() (*slog.Logger, *bytes.Buffer) {
@@ -133,5 +140,97 @@ func TestLogTransport_ElapsedAndMethodRecorded(t *testing.T) {
 	}
 	if !strings.Contains(out, "elapsed=") {
 		t.Errorf("want elapsed=, got: %s", out)
+	}
+}
+
+func newTracerProviderWithExporter(exp *tracetest.InMemoryExporter) *sdktrace.TracerProvider {
+	return sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+}
+
+// withTestPropagator installs the W3C TraceContext propagator for the
+// duration of the test, restoring whatever was previously registered.
+// Production code expects internal/otel.Init to do this once at startup.
+func withTestPropagator(t *testing.T) {
+	t.Helper()
+	orig := otel.GetTextMapPropagator()
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() { otel.SetTextMapPropagator(orig) })
+}
+
+func TestTraceTransport_CreatesSpanAndInjectsHeaders(t *testing.T) {
+	withTestPropagator(t)
+	exp := tracetest.NewInMemoryExporter()
+	tp := newTracerProviderWithExporter(exp)
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+
+	var gotHeaders http.Header
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		gotHeaders = r.Header.Clone()
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	origTracer := tracer
+	tracer = tp.Tracer("test")
+	t.Cleanup(func() { tracer = origTracer })
+
+	ctx, span := tracer.Start(context.Background(), "parent")
+	defer span.End()
+
+	rt := traceTransport{parent: http.DefaultTransport}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer resp.Body.Close()
+
+	spans := exp.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("want 1 span, got %d", len(spans))
+	}
+	if !strings.HasPrefix(spans[0].Name, "HTTP ") {
+		t.Errorf("span name = %q, want 'HTTP ...' prefix", spans[0].Name)
+	}
+	if h := gotHeaders.Get("Traceparent"); h == "" {
+		t.Errorf("want traceparent header injected, got none")
+	}
+}
+
+func TestTraceTransport_5xxMarksError(t *testing.T) {
+	withTestPropagator(t)
+	exp := tracetest.NewInMemoryExporter()
+	tp := newTracerProviderWithExporter(exp)
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	origTracer := tracer
+	tracer = tp.Tracer("test")
+	t.Cleanup(func() { tracer = origTracer })
+
+	ctx, span := tracer.Start(context.Background(), "parent")
+	defer span.End()
+
+	rt := traceTransport{parent: http.DefaultTransport}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer resp.Body.Close()
+
+	spans := exp.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("want 1 span, got %d", len(spans))
+	}
+	if spans[0].Status.Code != codes.Error {
+		t.Errorf("want span status Error, got %v", spans[0].Status.Code)
 	}
 }
