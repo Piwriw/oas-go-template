@@ -7,6 +7,12 @@
 server:
   http_addr: ":8000"
   gin_mode: debug            # debug | release | test
+  read_header_timeout: 5s
+  read_timeout: 15s
+  write_timeout: 30s         # set to 0 for streaming responses
+  idle_timeout: 60s
+  max_header_bytes: 1048576  # 1 MiB
+  max_body_bytes: 1048576    # 1 MiB; 0 disables the application limit
 
 db:
   driver: ""                 # postgres | mysql | sqlite; empty = disabled

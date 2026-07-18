@@ -26,6 +26,7 @@ golangci-lint v2 config, and a Vite + React + TS frontend (deployed separately).
 - [Database (Gorm)](#database-gorm)
 - [Local Observability Stack](#local-observability-stack)
 - [Daily Workflow](#daily-workflow)
+- [Changelog](CHANGELOG.md)
 - [License](#license)
 
 ## Tech Stack
@@ -125,6 +126,11 @@ scratch runs don't need to author one. Validation (`gin_mode`, `log.format`,
 On Kubernetes, set Helm's `server.existingConfigSecret.name` to mount a
 Secret containing the complete `config.yaml`. This keeps the YAML-only config
 model while allowing DSNs and exporter credentials to stay out of chart values.
+
+The HTTP server defaults to a 5s read-header timeout, 15s read timeout, 30s
+write timeout, 60s idle timeout, 1 MiB headers, and 1 MiB request bodies. Tune
+these under `server` in `config.yaml`; set `write_timeout: 0` for streaming
+responses and `max_body_bytes: 0` to disable the application body limit.
 
 ## Database (Gorm)
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,18 +14,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
+	ginmiddleware "github.com/oapi-codegen/gin-middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"gorm.io/gorm"
 
-	"github.com/piwriw/oas-go-template/internal/api"
+	internalapi "github.com/piwriw/oas-go-template/internal/api"
 	"github.com/piwriw/oas-go-template/internal/config"
 	"github.com/piwriw/oas-go-template/internal/db"
 	"github.com/piwriw/oas-go-template/internal/handler"
 	"github.com/piwriw/oas-go-template/internal/logging"
 	"github.com/piwriw/oas-go-template/internal/otel"
 	"github.com/piwriw/oas-go-template/internal/version"
+	specapi "github.com/piwriw/oas-go-template/pkg/api"
 )
 
 const serviceName = "oas-go-template"
@@ -83,10 +87,10 @@ func run(configPath string) error {
 	return serveAndWait(ctx, srv, stop)
 }
 
-// newHTTPServer wires the gin router (recovery + otelgin + logging middleware),
-// registers the strict API handler, mounts the Prometheus /metrics route,
-// and wraps it all in an *http.Server with a read-header timeout to
-// defuse slowloris-style attacks.
+// newHTTPServer wires the gin router (recovery + otelgin + logging + request
+// body limit), validates API requests against the embedded OAS document,
+// registers the strict API handler, mounts the Prometheus /metrics route, and
+// applies HTTP timeouts and header limits to defuse common resource attacks.
 //
 // The OTel Prometheus exporter (when OTel is enabled in cfg.OTel.Enabled)
 // and client_golang's built-in Go/process collectors both feed
@@ -94,12 +98,15 @@ func run(configPath string) error {
 // promhttp.Handler. No explicit collector registration needed.
 func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	h := handler.New(gdb)
-	strictHandler := api.NewStrictHandler(h, nil)
+	strictHandler := internalapi.NewStrictHandlerWithOptions(h, nil, handler.StrictServerOptions())
 
 	r := gin.New()
+	r.HandleMethodNotAllowed = true
 	// otelgin must run before logging so logging.Middleware can read the active span
 	// from c.Request.Context() and inject trace_id into the log line.
-	r.Use(gin.Recovery(), otelgin.Middleware(serviceName), logging.Middleware())
+	r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(cfg.Server.MaxBodyBytes))
+	r.NoRoute(handler.NoRoute)
+	r.NoMethod(handler.NoMethod)
 
 	// /metrics is intentionally NOT in spec/openapi.yaml and not configurable —
 	// it's an ops endpoint, not part of the API contract, and there's no good
@@ -107,13 +114,39 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	// GetMetricsWithResponses method.
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	api.RegisterHandlers(r, strictHandler)
+	// Keep the operational /metrics route outside the OAS validator because it
+	// is intentionally not part of the public API contract.
+	apiRoutes := r.Group("", openAPIValidator(openAPISpec()))
+	internalapi.RegisterHandlers(apiRoutes, strictHandler)
 
 	return &http.Server{
 		Addr:              cfg.Server.HTTPAddr,
 		Handler:           r,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout,
+		ReadTimeout:       cfg.Server.ReadTimeout,
+		WriteTimeout:      cfg.Server.WriteTimeout,
+		IdleTimeout:       cfg.Server.IdleTimeout,
+		MaxHeaderBytes:    cfg.Server.MaxHeaderBytes,
 	}
+}
+
+// openAPISpec loads the generated embedded contract once per server build.
+// Server URLs in the document describe deployment endpoints; they should not
+// make local host validation reject otherwise valid requests.
+func openAPISpec() (swaggerSpec *openapi3.T) {
+	swaggerSpec, err := specapi.GetSpec()
+	if err != nil {
+		panic(fmt.Sprintf("load embedded OpenAPI spec: %v", err))
+	}
+	swaggerSpec.Servers = nil
+	return swaggerSpec
+}
+
+func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
+	return ginmiddleware.OapiRequestValidatorWithOptions(swaggerSpec, &ginmiddleware.Options{
+		ErrorHandler:          handler.OAPIValidationError,
+		SilenceServersWarning: true,
+	})
 }
 
 // serveAndWait starts srv in a goroutine and blocks until either ctx is

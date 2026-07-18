@@ -20,6 +20,7 @@
 - [数据库 (Gorm)](#数据库-gorm)
 - [本地可观测性栈](#本地可观测性栈)
 - [日常开发流程](#日常开发流程)
+- [变更日志](CHANGELOG.zh-CN.md)
 - [License](#license)
 
 ## 技术栈
@@ -106,6 +107,8 @@ cp config.example.yaml config.yaml
 `config.yaml` 缺失也没关系——内置默认值会接管，测试和临时跑跑不用准备配置文件。校验（`gin_mode`、`log.format`、`db.driver` 白名单等）在 YAML 合并到默认值之后执行。
 
 在 Kubernetes 中，可设置 Helm 的 `server.existingConfigSecret.name`，挂载包含完整 `config.yaml` 的 Secret。这样既保持仅 YAML 的配置模型，又能避免 DSN、exporter 凭据等密钥进入 chart values。
+
+HTTP 服务默认使用 5 秒读请求头超时、15 秒读超时、30 秒写超时、60 秒空闲超时，限制请求头为 1 MiB、请求体为 1 MiB。可在 `config.yaml` 的 `server` 下调整；流式响应可将 `write_timeout: 0`，应用层请求体限制可将 `max_body_bytes: 0` 关闭。
 
 ## 数据库 (Gorm)
 

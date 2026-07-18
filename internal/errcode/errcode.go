@@ -29,6 +29,21 @@ package errcode
 // arbitrary numbers where a known code is expected.
 type Code int32
 
+// Request and validation errors (10xxx).
+const (
+	InvalidRequest      Code = 10001
+	RequestBodyTooLarge Code = 10002
+)
+
+// Resource and routing errors (30xxx).
+const (
+	NotFound         Code = 30001
+	MethodNotAllowed Code = 30002
+)
+
+// Internal errors (99xxx).
+const Internal Code = 99001
+
 // Database-related codes (50xxx) — returned when a configured DB is
 // misbehaving or unreachable. See internal/handler/health.go:GetReady.
 const (

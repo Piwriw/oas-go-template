@@ -34,8 +34,14 @@ type Config struct {
 
 // ServerConfig carries HTTP server settings.
 type ServerConfig struct {
-	HTTPAddr string `mapstructure:"http_addr"`
-	GinMode  string `mapstructure:"gin_mode"`
+	HTTPAddr          string        `mapstructure:"http_addr"`
+	GinMode           string        `mapstructure:"gin_mode"`
+	ReadHeaderTimeout time.Duration `mapstructure:"read_header_timeout"`
+	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
+	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
+	MaxHeaderBytes    int           `mapstructure:"max_header_bytes"`
+	MaxBodyBytes      int64         `mapstructure:"max_body_bytes"`
 }
 
 // Load reads the YAML file at path, fills defaults, and validates. When path
@@ -72,8 +78,14 @@ func Load(path string) (*Config, error) {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			HTTPAddr: ":8000",
-			GinMode:  "debug",
+			HTTPAddr:          ":8000",
+			GinMode:           "debug",
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			MaxHeaderBytes:    1 << 20,
+			MaxBodyBytes:      1 << 20,
 		},
 		DB: db.Config{
 			MaxOpenConns:    25,
@@ -96,6 +108,23 @@ func validate(cfg *Config) error {
 	case "debug", "release", "test":
 	default:
 		return fmt.Errorf("invalid server.gin_mode %q (want debug|release|test)", cfg.Server.GinMode)
+	}
+
+	for name, value := range map[string]time.Duration{
+		"server.read_header_timeout": cfg.Server.ReadHeaderTimeout,
+		"server.read_timeout":        cfg.Server.ReadTimeout,
+		"server.write_timeout":       cfg.Server.WriteTimeout,
+		"server.idle_timeout":        cfg.Server.IdleTimeout,
+	} {
+		if value < 0 {
+			return fmt.Errorf("%s must be non-negative", name)
+		}
+	}
+	if cfg.Server.MaxHeaderBytes < 0 {
+		return fmt.Errorf("server.max_header_bytes must be non-negative")
+	}
+	if cfg.Server.MaxBodyBytes < 0 {
+		return fmt.Errorf("server.max_body_bytes must be non-negative")
 	}
 
 	switch strings.ToLower(cfg.Log.Format) {

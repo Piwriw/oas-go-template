@@ -55,7 +55,13 @@ Response type names come from the OAS status code + schema — **only use names 
 `cmd/server/main.go:newHTTPServer` wires the chain in this exact order:
 
 ```go
-r.Use(gin.Recovery(), otelgin.Middleware(serviceName), logging.Middleware())
+r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(cfg.Server.MaxBodyBytes))
+
+The generated API routes are registered on a separate group with the embedded
+OAS request validator. `/metrics` is intentionally registered outside that
+group because it is an ops endpoint absent from the public contract. Use
+`handler.StrictServerOptions()` for the generated strict handler so parse,
+handler, response, recovery, 404, and 405 errors all return `api.Error`.
 ```
 
 `otelgin` must run **before** `logging.Middleware` — logging reads the active span from `c.Request.Context()` to inject `trace_id` / `span_id` into each slog record (see `internal/logging/logging.go:otelHandler`). Reverse the order and trace context silently disappears from logs.

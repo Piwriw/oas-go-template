@@ -22,6 +22,12 @@ func TestLoad_fullYAML(t *testing.T) {
 server:
   http_addr: ":9999"
   gin_mode: release
+  read_header_timeout: 2s
+  read_timeout: 20s
+  write_timeout: 40s
+  idle_timeout: 90s
+  max_header_bytes: 2048
+  max_body_bytes: 4096
 db:
   driver: postgres
   dsn: "host=localhost dbname=app"
@@ -65,6 +71,32 @@ otel:
 	}
 }
 
+func TestLoad_serverProtectionYAML(t *testing.T) {
+	dir := t.TempDir()
+	p := writeFile(t, dir, `
+server:
+  read_header_timeout: 2s
+  read_timeout: 20s
+  write_timeout: 40s
+  idle_timeout: 90s
+  max_header_bytes: 2048
+  max_body_bytes: 4096
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Server.ReadHeaderTimeout != 2*time.Second || cfg.Server.ReadTimeout != 20*time.Second {
+		t.Errorf("read timeouts = %v/%v", cfg.Server.ReadHeaderTimeout, cfg.Server.ReadTimeout)
+	}
+	if cfg.Server.WriteTimeout != 40*time.Second || cfg.Server.IdleTimeout != 90*time.Second {
+		t.Errorf("write/idle timeouts = %v/%v", cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
+	}
+	if cfg.Server.MaxHeaderBytes != 2048 || cfg.Server.MaxBodyBytes != 4096 {
+		t.Errorf("request limits = %d/%d", cfg.Server.MaxHeaderBytes, cfg.Server.MaxBodyBytes)
+	}
+}
+
 func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	// Any path that doesn't exist → no error, defaults returned so dev/test
 	// workflows don't need to author a config file.
@@ -74,6 +106,15 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	}
 	if cfg.Server.HTTPAddr != ":8000" {
 		t.Errorf("default HTTPAddr = %q, want :8000", cfg.Server.HTTPAddr)
+	}
+	if cfg.Server.ReadHeaderTimeout != 5*time.Second || cfg.Server.ReadTimeout != 15*time.Second {
+		t.Errorf("default read timeouts = %v/%v", cfg.Server.ReadHeaderTimeout, cfg.Server.ReadTimeout)
+	}
+	if cfg.Server.WriteTimeout != 30*time.Second || cfg.Server.IdleTimeout != 60*time.Second {
+		t.Errorf("default write/idle timeouts = %v/%v", cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
+	}
+	if cfg.Server.MaxHeaderBytes != 1<<20 || cfg.Server.MaxBodyBytes != 1<<20 {
+		t.Errorf("default request limits = %d/%d", cfg.Server.MaxHeaderBytes, cfg.Server.MaxBodyBytes)
 	}
 	if !cfg.OTel.Enabled {
 		t.Errorf("default OTel.Enabled should be true")
@@ -140,6 +181,23 @@ log:
 	}
 }
 
+func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
+	tests := map[string]string{
+		"read timeout":     "read_timeout: -1s",
+		"max header bytes": "max_header_bytes: -1",
+		"max body bytes":   "max_body_bytes: -1",
+	}
+	for name, field := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			p := writeFile(t, dir, "server:\n  "+field+"\n")
+			if _, err := Load(p); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 // viper.Unmarshal zero-fills fields that exist in the struct but aren't in
 // the YAML. This test pins the contract: if a yaml is missing a nested field,
 // the default for that field is preserved.
@@ -160,6 +218,9 @@ server:
 	}
 	if cfg.Server.GinMode != "debug" {
 		t.Errorf("GinMode default dropped: got %q", cfg.Server.GinMode)
+	}
+	if cfg.Server.ReadHeaderTimeout != 5*time.Second || cfg.Server.MaxBodyBytes != 1<<20 {
+		t.Errorf("server protection defaults dropped: got %+v", cfg.Server)
 	}
 	if cfg.DB.MaxOpenConns != 25 {
 		t.Errorf("DB.MaxOpenConns default dropped: got %d", cfg.DB.MaxOpenConns)

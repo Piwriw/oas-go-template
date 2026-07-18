@@ -197,7 +197,7 @@ make dev-stack-down                                         # stop when done
 
 What to look for:
 
-- **Log lines** include `trace_id` and `span_id` because `otelgin.Middleware` runs before `logging.Middleware()` in `cmd/server/main.go`. If you swap their order, you lose trace context in logs.
+- **Log lines** include `trace_id` and `span_id` because `otelgin.Middleware` runs before `logging.Middleware()` in `cmd/server/main.go`. If you swap their order, you lose trace context in logs. The same chain also applies `handler.BodyLimit`; generated API routes add OAS validation after the common chain, while `/metrics` stays outside the OAS group.
 - **Jaeger UI** shows the service with one server span per request.
 - **`trace_id` in logs matches the trace ID in Jaeger** — copy-paste to confirm.
 
