@@ -96,7 +96,7 @@ walkthrough.
 For a project you've already initialized (or to explore the template itself):
 
 ```bash
-make gen       # regenerate *.gen.go from spec/openapi.yaml
+make gen       # regenerate *.gen.go (pinned oapi-codegen v2.7.1)
 make build     # build cmd/server and cmd/client into bin/
 make run       # go run cmd/server with version ldflags
 make test      # go test -race -cover ./...

@@ -98,6 +98,11 @@ Then regenerate:
 make gen
 ```
 
+`scripts/gen.sh` pins `oapi-codegen` to v2.7.1 so committed generated files
+remain deterministic in CI. Upgrade deliberately with
+`OAPI_CODEGEN_VERSION=vX.Y.Z make gen`, review the full generated diff, and
+commit the generator change together with the regenerated outputs.
+
 `scripts/gen.sh` calls `oapi-codegen` **five** times:
 
 | Output file | package | what |

@@ -13,11 +13,14 @@ cd "$(dirname "$0")/.."
 SPEC="spec/openapi.yaml"
 CONFIG="oapi-codegen.yaml"
 TOOL="github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"
+OAPI_CODEGEN_VERSION="${OAPI_CODEGEN_VERSION:-v2.7.1}"
 
-# Ensure the binary is available
-if ! command -v oapi-codegen >/dev/null 2>&1; then
-  echo "Installing oapi-codegen..."
-  go install "$TOOL@latest"
+# Generated files are committed, so the generator version must be stable across
+# developer machines and CI. Override OAPI_CODEGEN_VERSION only as a coordinated
+# generator upgrade, then regenerate and commit all outputs together.
+if ! command -v oapi-codegen >/dev/null 2>&1 || ! oapi-codegen --version 2>/dev/null | grep -Fqx "$OAPI_CODEGEN_VERSION"; then
+  echo "Installing oapi-codegen ${OAPI_CODEGEN_VERSION}..."
+  go install "$TOOL@$OAPI_CODEGEN_VERSION"
 fi
 
 mkdir -p internal/api pkg/api

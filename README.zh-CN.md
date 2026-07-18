@@ -83,7 +83,7 @@ author 的值再继续。
 针对已经初始化的项目（或仅想体验模板本身）：
 
 ```bash
-make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go
+make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go（固定 oapi-codegen v2.7.1）
 make build     # 编译 cmd/server 和 cmd/client 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server
 make test      # go test -race -cover ./...

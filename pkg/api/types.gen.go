@@ -45,3 +45,18 @@ type VersionInfo struct {
 	// Version Semver (or git describe) of the build
 	Version string `json:"version"`
 }
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Error
+
+// ContentTooLarge defines model for ContentTooLarge.
+type ContentTooLarge = Error
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError = Error
+
+// MethodNotAllowed defines model for MethodNotAllowed.
+type MethodNotAllowed = Error
+
+// NotFound defines model for NotFound.
+type NotFound = Error

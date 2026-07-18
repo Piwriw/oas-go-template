@@ -9,8 +9,8 @@ small.
 Requirements:
 
 - Go 1.25+
-- [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) — pulled via
-  `scripts/gen.sh` using `go run`, no separate install needed
+- [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) v2.7.1 —
+  installed by `scripts/gen.sh`, no separate install needed
 - `make`, `docker`, `helm` (only for chart changes), Node 22+ (only for `web/`)
 - `golangci-lint` v2 — install via
   `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`
@@ -26,6 +26,7 @@ make gen build test
 
 ```bash
 make gen        # regenerate *.gen.go after editing spec/openapi.yaml
+# OAPI_CODEGEN_VERSION=vX.Y.Z make gen  # coordinated generator upgrade only
 make lint test  # always green before pushing
 make audit      # govulncheck + gosec, exits non-zero on findings
 ```

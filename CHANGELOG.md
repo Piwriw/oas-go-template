@@ -15,6 +15,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A consistent `api.Error` response for request parsing, routing, handler,
   response serialization, and panic failures.
 - Configurable HTTP read, write, idle, header, and request-body limits.
+- Typed client response fields for standard 400, 404, 405, 413, and 500 API
+  errors.
 - Structured error logging that keeps internal details and panic stack traces
   out of public responses.
 
