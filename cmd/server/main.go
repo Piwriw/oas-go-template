@@ -18,7 +18,6 @@ import (
 	"github.com/gin-gonic/gin"
 	ginmiddleware "github.com/oapi-codegen/gin-middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"gorm.io/gorm"
 
 	internalapi "github.com/piwriw/oas-go-template/internal/api"
@@ -26,6 +25,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/db"
 	"github.com/piwriw/oas-go-template/internal/handler"
 	"github.com/piwriw/oas-go-template/internal/logging"
+	"github.com/piwriw/oas-go-template/internal/middleware"
 	"github.com/piwriw/oas-go-template/internal/otel"
 	"github.com/piwriw/oas-go-template/internal/version"
 	specapi "github.com/piwriw/oas-go-template/pkg/api"
@@ -87,10 +87,11 @@ func run(configPath string) error {
 	return serveAndWait(ctx, srv, stop)
 }
 
-// newHTTPServer wires the gin router (recovery + otelgin + logging + request
-// body limit), validates API requests against the embedded OAS document,
-// registers the strict API handler, mounts the Prometheus /metrics route, and
-// applies HTTP timeouts and header limits to defuse common resource attacks.
+// newHTTPServer wires the gin router (recovery + otelgin + logging + optional
+// CORS + request body limit), validates API requests against the embedded OAS
+// document, registers the strict API handler, mounts the Prometheus /metrics
+// route, and applies HTTP timeouts and header limits to defuse common resource
+// attacks.
 //
 // The OTel Prometheus exporter (when OTel is enabled in cfg.OTel.Enabled)
 // and client_golang's built-in Go/process collectors both feed
@@ -102,9 +103,11 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
-	// otelgin must run before logging so logging.Middleware can read the active span
-	// from c.Request.Context() and inject trace_id into the log line.
-	r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(cfg.Server.MaxBodyBytes))
+	middleware.Use(r, middleware.Options{
+		ServiceName:  serviceName,
+		MaxBodyBytes: cfg.Server.MaxBodyBytes,
+		CORS:         cfg.CORS,
+	})
 	r.NoRoute(handler.NoRoute)
 	r.NoMethod(handler.NoMethod)
 

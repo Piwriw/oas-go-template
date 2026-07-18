@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/piwriw/oas-go-template/internal/api"
 	"github.com/piwriw/oas-go-template/internal/errcode"
@@ -33,15 +34,17 @@ func (h *Handler) GetReady(ctx context.Context, _ api.GetReadyRequestObject) (ap
 	}
 	sqlDB, err := h.db.DB()
 	if err != nil {
+		slog.ErrorContext(ctx, "readiness database handle failed", "err", err)
 		return api.GetReady503JSONResponse(api.Error{
 			Code:    int32(errcode.DBHandle),
-			Message: err.Error(),
+			Message: "database unavailable",
 		}), nil
 	}
 	if err := sqlDB.PingContext(ctx); err != nil {
+		slog.ErrorContext(ctx, "readiness database ping failed", "err", err)
 		return api.GetReady503JSONResponse(api.Error{
 			Code:    int32(errcode.DBPing),
-			Message: err.Error(),
+			Message: "database unavailable",
 		}), nil
 	}
 	return api.GetReady200JSONResponse(api.Health{

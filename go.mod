@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/getkin/kin-openapi v0.140.0
+	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/oapi-codegen/gin-middleware v1.0.2
 	github.com/prometheus/client_golang v1.23.2

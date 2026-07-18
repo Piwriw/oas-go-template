@@ -82,6 +82,12 @@ func NoMethod(c *gin.Context) {
 	writeError(c, http.StatusMethodNotAllowed, errcode.MethodNotAllowed, "method not allowed", fmt.Errorf("%s %s", c.Request.Method, c.Request.URL.Path))
 }
 
+// Forbidden writes the common 403 response. Middleware should pass the
+// detailed reason for logging while callers receive a stable message.
+func Forbidden(c *gin.Context, detail error) {
+	writeError(c, http.StatusForbidden, errcode.Forbidden, "forbidden", detail)
+}
+
 func writeError(c *gin.Context, status int, code errcode.Code, message string, detail error) {
 	logger := logging.From(c)
 	args := []any{"status", status, "code", int32(code)}

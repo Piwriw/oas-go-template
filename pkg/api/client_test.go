@@ -10,6 +10,7 @@ import (
 func TestGetVersionWithResponseParsesTypedErrorStatuses(t *testing.T) {
 	statuses := []int{
 		http.StatusBadRequest,
+		http.StatusForbidden,
 		http.StatusNotFound,
 		http.StatusMethodNotAllowed,
 		http.StatusRequestEntityTooLarge,
@@ -51,6 +52,8 @@ func typedErrorForStatus(response *GetVersionResponse, status int) *Error {
 	switch status {
 	case http.StatusBadRequest:
 		return response.JSON400
+	case http.StatusForbidden:
+		return response.JSON403
 	case http.StatusNotFound:
 		return response.JSON404
 	case http.StatusMethodNotAllowed:

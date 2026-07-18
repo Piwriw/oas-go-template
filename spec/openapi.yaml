@@ -23,6 +23,8 @@ paths:
                 $ref: '#/components/schemas/Health'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '405':
@@ -46,6 +48,8 @@ paths:
                 $ref: '#/components/schemas/Health'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '405':
@@ -75,6 +79,8 @@ paths:
                 $ref: '#/components/schemas/VersionInfo'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '405':
@@ -87,6 +93,12 @@ components:
   responses:
     BadRequest:
       description: The request could not be parsed or failed contract validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: The request is not allowed by the server policy.
       content:
         application/json:
           schema:

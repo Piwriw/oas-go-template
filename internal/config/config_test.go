@@ -71,6 +71,30 @@ otel:
 	}
 }
 
+func TestLoad_corsYAML(t *testing.T) {
+	dir := t.TempDir()
+	p := writeFile(t, dir, `
+cors:
+  enabled: true
+  allow_origins: ["https://app.example.com"]
+  allow_methods: [GET, OPTIONS]
+  allow_headers: [Content-Type, X-Request-ID]
+  expose_headers: [X-Request-ID]
+  allow_credentials: true
+  max_age: 1h
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.CORS.Enabled || len(cfg.CORS.AllowOrigins) != 1 || cfg.CORS.AllowOrigins[0] != "https://app.example.com" {
+		t.Errorf("CORS origins = %+v", cfg.CORS.AllowOrigins)
+	}
+	if cfg.CORS.MaxAge != time.Hour || !cfg.CORS.AllowCredentials {
+		t.Errorf("CORS = %+v", cfg.CORS)
+	}
+}
+
 func TestLoad_serverProtectionYAML(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -118,6 +142,12 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	}
 	if !cfg.OTel.Enabled {
 		t.Errorf("default OTel.Enabled should be true")
+	}
+	if cfg.CORS.Enabled {
+		t.Errorf("default CORS.Enabled should be false")
+	}
+	if cfg.CORS.MaxAge != 12*time.Hour {
+		t.Errorf("default CORS.MaxAge = %v, want 12h", cfg.CORS.MaxAge)
 	}
 }
 
@@ -193,6 +223,34 @@ func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
 			p := writeFile(t, dir, "server:\n  "+field+"\n")
 			if _, err := Load(p); err == nil {
 				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestLoad_rejectsInvalidCORSConfig(t *testing.T) {
+	tests := map[string]string{
+		"enabled without origins": `cors:
+  enabled: true
+`,
+		"credentials with wildcard": `cors:
+  enabled: true
+  allow_origins: ["*"]
+  allow_credentials: true
+`,
+		"invalid origin": `cors:
+  enabled: true
+  allow_origins: ["app.example.com"]
+`,
+		"negative max age": `cors:
+  max_age: -1s
+`,
+	}
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if _, err := Load(writeFile(t, dir, body)); err == nil {
+				t.Fatal("expected CORS validation error")
 			}
 		})
 	}

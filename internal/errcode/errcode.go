@@ -35,6 +35,11 @@ const (
 	RequestBodyTooLarge Code = 10002
 )
 
+const (
+	// Forbidden indicates the request is not allowed by the server policy.
+	Forbidden Code = 20001
+)
+
 // Resource and routing errors (30xxx).
 const (
 	NotFound         Code = 30001

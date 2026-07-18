@@ -271,6 +271,7 @@ type GetHealthResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *Health
 	JSON400      *BadRequest
+	JSON403      *Forbidden
 	JSON404      *NotFound
 	JSON405      *MethodNotAllowed
 	JSON413      *ContentTooLarge
@@ -306,6 +307,7 @@ type GetReadyResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *Health
 	JSON400      *BadRequest
+	JSON403      *Forbidden
 	JSON404      *NotFound
 	JSON405      *MethodNotAllowed
 	JSON413      *ContentTooLarge
@@ -342,6 +344,7 @@ type GetVersionResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *VersionInfo
 	JSON400      *BadRequest
+	JSON403      *Forbidden
 	JSON404      *NotFound
 	JSON405      *MethodNotAllowed
 	JSON413      *ContentTooLarge
@@ -427,6 +430,13 @@ func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -487,6 +497,13 @@ func ParseGetReadyResponse(rsp *http.Response) (*GetReadyResponse, error) {
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -555,6 +572,13 @@ func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound

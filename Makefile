@@ -32,7 +32,7 @@ test:  ## Run all tests
 	go test -race -cover ./...
 
 lint:  ## Run golangci-lint
-	golangci-lint run
+	golangci-lint run ./...
 
 fmt:  ## Format Go code with goimports (gofmt + import grouping)
 	goimports -local github.com/piwriw/oas-go-template -w .

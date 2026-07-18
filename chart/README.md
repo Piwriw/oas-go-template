@@ -96,9 +96,9 @@ restart the Deployment or use a reloader controller.
 
 ## Switching OTel on
 
-The default config points the OTLP exporter at `http://otel-collector:4318`
-inside the cluster. If you don't run a collector, set `otel.enabled=false`
-or override the endpoint:
+The chart default keeps OTel disabled because the chart does not deploy a
+collector. When a collector is available at `http://otel-collector:4318`,
+enable it in the mounted config:
 
 ```bash
 helm install my-release ./chart \

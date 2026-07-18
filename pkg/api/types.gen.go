@@ -52,6 +52,9 @@ type BadRequest = Error
 // ContentTooLarge defines model for ContentTooLarge.
 type ContentTooLarge = Error
 
+// Forbidden defines model for Forbidden.
+type Forbidden = Error
+
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = Error
 

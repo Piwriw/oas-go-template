@@ -49,10 +49,18 @@ server:
       format: json
       level: info
     otel:
-      enabled: true
+      enabled: false
       exporter_otlp_endpoint: "http://otel-collector:4318"
       service_name: ""
       service_version: ""
+    cors:
+      enabled: false
+      allow_origins: []
+      allow_methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      allow_headers: [Origin, Content-Type, Accept, Authorization, X-Request-ID]
+      expose_headers: [X-Request-ID]
+      allow_credentials: false
+      max_age: 12h
 
 web:
   # -- Deploy the frontend alongside the server. Disable if you serve
@@ -79,16 +87,16 @@ serviceAccount:
 podAnnotations: {}
 
 # -- Pod-level security context (runAsNonRoot etc.).
-podSecurityContext: {}
-  # runAsNonRoot: true
-  # runAsUser: 10001
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
 
 # -- Container-level security context.
-securityContext: {}
-  # readOnlyRootFilesystem: true
-  # allowPrivilegeEscalation: false
-  # capabilities:
-  #   drop: [ALL]
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
 
 ingress:
   # -- Enable Ingress. Off by default — enable per-environment.

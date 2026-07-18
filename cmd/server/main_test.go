@@ -64,6 +64,108 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 	}
 }
 
+func TestCORSIsDisabledByDefault(t *testing.T) {
+	srv := newHTTPServer(testConfig(), nil)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.Header.Set("Origin", "https://app.example.com")
+	srv.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("CORS unexpectedly enabled: Access-Control-Allow-Origin=%q", got)
+	}
+}
+
+func TestCORSAllowedOriginAndPreflight(t *testing.T) {
+	cfg := testConfig()
+	cfg.CORS = config.CORSConfig{
+		Enabled:          true,
+		AllowOrigins:     []string{"https://app.example.com"},
+		AllowMethods:     []string{"GET", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type", "X-Request-ID"},
+		ExposeHeaders:    []string{"X-Request-ID"},
+		AllowCredentials: true,
+		MaxAge:           time.Hour,
+	}
+	srv := newHTTPServer(cfg, nil)
+
+	t.Run("normal request", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		req.Header.Set("Origin", "https://app.example.com")
+		srv.Handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
+			t.Errorf("allow origin=%q", got)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+			t.Errorf("allow credentials=%q", got)
+		}
+		if got := rec.Header().Get("Access-Control-Expose-Headers"); got != "X-Request-Id" {
+			t.Errorf("expose headers=%q", got)
+		}
+	})
+
+	t.Run("preflight", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodOptions, "/healthz", nil)
+		req.Header.Set("Origin", "https://app.example.com")
+		req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type, X-Request-ID")
+		srv.Handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
+			t.Errorf("allow origin=%q", got)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET,OPTIONS" {
+			t.Errorf("allow methods=%q", got)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type,X-Request-Id" {
+			t.Errorf("allow headers=%q", got)
+		}
+		if got := rec.Header().Get("Access-Control-Max-Age"); got != "3600" {
+			t.Errorf("max age=%q", got)
+		}
+	})
+}
+
+func TestCORSRejectsDisallowedOrigin(t *testing.T) {
+	cfg := testConfig()
+	cfg.CORS = config.CORSConfig{
+		Enabled:      true,
+		AllowOrigins: []string{"https://app.example.com"},
+		AllowMethods: []string{"GET", "OPTIONS"},
+	}
+	srv := newHTTPServer(cfg, nil)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.Header.Set("Origin", "https://attacker.example")
+	srv.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body internalapi.Error
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode forbidden response: %v; body=%s", err, rec.Body.String())
+	}
+	if body.Code != int32(errcode.Forbidden) || body.Message != "forbidden" {
+		t.Errorf("body=%+v", body)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("disallowed origin got CORS header=%q", got)
+	}
+}
+
 func TestOASValidatorRejectsMissingRequiredQuery(t *testing.T) {
 	spec := openAPISpec()
 	typeValue := openapi3.Types{openapi3.TypeString}

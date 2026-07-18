@@ -110,6 +110,8 @@ type BadRequestJSONResponse Error
 
 type ContentTooLargeJSONResponse Error
 
+type ForbiddenJSONResponse Error
+
 type InternalServerErrorJSONResponse Error
 
 type MethodNotAllowedJSONResponse Error
@@ -147,6 +149,20 @@ func (response GetHealth400JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHealth403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetHealth403JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -240,6 +256,20 @@ func (response GetReady400JSONResponse) VisitGetReadyResponse(w http.ResponseWri
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReady403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetReady403JSONResponse) VisitGetReadyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -347,6 +377,20 @@ func (response GetVersion400JSONResponse) VisitGetVersionResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVersion403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetVersion403JSONResponse) VisitGetVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
