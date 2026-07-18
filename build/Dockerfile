@@ -45,7 +45,6 @@ USER app
 WORKDIR /app
 COPY --from=builder /out/server /app/server
 
-ENV HTTP_ADDR=:8000
 EXPOSE 8000
 
 ENTRYPOINT ["/app/server"]

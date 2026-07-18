@@ -227,7 +227,7 @@ db:
   log_sql: false                                # flip to true to log every SQL statement
 ```
 
-`*gorm.DB` is already wired into `handler.New(gdb)` and `/readyz` reports 503 when `db==nil` or ping fails. Pass nil during DB-free development; the handler is nil-safe.
+`*gorm.DB` is already wired into `handler.New(gdb)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503.
 
 ## Error codes — `internal/errcode`
 

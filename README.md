@@ -122,11 +122,15 @@ Missing `config.yaml` is fine — built-in defaults take over so tests and
 scratch runs don't need to author one. Validation (`gin_mode`, `log.format`,
 `db.driver` whitelist, etc.) runs after YAML has been merged into defaults.
 
+On Kubernetes, set Helm's `server.existingConfigSecret.name` to mount a
+Secret containing the complete `config.yaml`. This keeps the YAML-only config
+model while allowing DSNs and exporter credentials to stay out of chart values.
+
 ## Database (Gorm)
 
 DB is **opt-in**. Set `db.driver` in `config.yaml` and the server connects at
-boot; leave it empty and the server runs DB-free (`/readyz` reports 503 in
-that case — graceful degradation, not panic).
+boot; leave it empty and the server runs DB-free. Because a disabled database
+is not a configured dependency, `/readyz` still reports 200 in that mode.
 
 ```yaml
 # config.yaml

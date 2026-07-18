@@ -1,12 +1,12 @@
 # oas-go-template example config.
 #
 # Copy to config.yaml and edit. Real config.yaml is gitignored so secrets stay
-# out of the repo. Any field below can also be overridden via env — see
-# internal/config/config.go for the env-name list (look for `env:"..."` tags).
+# out of the repo. Configuration is YAML-only; environment variables do not
+# override these fields.
 
 server:
-  http_addr: ":8000"          # env: HTTP_ADDR
-  gin_mode: debug            # env: GIN_MODE  (debug | release | test)
+  http_addr: ":8000"
+  gin_mode: debug            # debug | release | test
 
 db:
   driver: ""                 # postgres | mysql | sqlite; empty = disabled

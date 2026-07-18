@@ -16,8 +16,14 @@ spec:
   template:
     metadata:
       annotations:
-        # Roll the pod whenever the mounted config changes.
+        {{- if .Values.server.existingConfigSecret.name }}
+        # Roll when the selected Secret reference changes. For content-only
+        # Secret updates, restart the Deployment or use a reloader controller.
+        checksum/config: {{ printf "%s:%s" .Values.server.existingConfigSecret.name .Values.server.existingConfigSecret.key | sha256sum }}
+        {{- else }}
+        # Roll the pod whenever the chart-managed config changes.
         checksum/config: {{ include (print $.Template.BasePath "/server-configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -82,5 +88,13 @@ spec:
               readOnly: true
       volumes:
         - name: config
+          {{- if .Values.server.existingConfigSecret.name }}
+          secret:
+            secretName: {{ .Values.server.existingConfigSecret.name | quote }}
+            items:
+              - key: {{ required "server.existingConfigSecret.key is required when name is set" .Values.server.existingConfigSecret.key | quote }}
+                path: config.yaml
+          {{- else }}
           configMap:
             name: {{ include "oas-go-template.fullname" . }}-server
+          {{- end }}

@@ -105,9 +105,11 @@ cp config.example.yaml config.yaml
 
 `config.yaml` 缺失也没关系——内置默认值会接管，测试和临时跑跑不用准备配置文件。校验（`gin_mode`、`log.format`、`db.driver` 白名单等）在 YAML 合并到默认值之后执行。
 
+在 Kubernetes 中，可设置 Helm 的 `server.existingConfigSecret.name`，挂载包含完整 `config.yaml` 的 Secret。这样既保持仅 YAML 的配置模型，又能避免 DSN、exporter 凭据等密钥进入 chart values。
+
 ## 数据库 (Gorm)
 
-数据库是**可选启用的**。在 `config.yaml` 设置 `db.driver`，服务启动时连接；留空则不启用数据库（`/readyz` 返回 503 表示未就绪——优雅降级，不 panic）。
+数据库是**可选启用的**。在 `config.yaml` 设置 `db.driver`，服务启动时连接；留空则不启用数据库。禁用的数据库不是已配置依赖，因此此模式下 `/readyz` 仍返回 200。
 
 ```yaml
 # config.yaml

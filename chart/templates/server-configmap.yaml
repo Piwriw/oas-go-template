@@ -1,3 +1,4 @@
+{{- if not .Values.server.existingConfigSecret.name }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,3 +10,4 @@ data:
   # server reads this via -c /app/config.yaml (see server-deployment.yaml args).
   config.yaml: |
     {{- .Values.server.config | nindent 4 }}
+{{- end }}

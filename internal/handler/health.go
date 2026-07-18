@@ -19,17 +19,16 @@ func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (ap
 }
 
 // GetReady implements api.StrictServerInterface.GetReady — readiness probe.
-// Returns 200 when configured dependencies are reachable; 503 when a
-// dependency hasn't been wired (e.g. db.driver empty) or is failing.
+// Returns 200 when every configured dependency is reachable. A nil DB means
+// the database is intentionally disabled, so there is nothing to check.
 //
 // Errors are intentionally converted to typed 503 responses and paired with
 // a nil return error — StrictServerInterface convention. Returning the raw
 // err would route to gin's generic 500 path and discard the structured body.
 func (h *Handler) GetReady(ctx context.Context, _ api.GetReadyRequestObject) (api.GetReadyResponseObject, error) {
 	if h.db == nil {
-		return api.GetReady503JSONResponse(api.Error{
-			Code:    int32(errcode.DBUnavailable),
-			Message: "db not configured",
+		return api.GetReady200JSONResponse(api.Health{
+			Status: "ok",
 		}), nil
 	}
 	sqlDB, err := h.db.DB()

@@ -29,10 +29,12 @@ package errcode
 // arbitrary numbers where a known code is expected.
 type Code int32
 
-// Database-related codes (50xxx) — returned when the configured DB is
-// missing, misbehaving, or unreachable. See internal/handler/health.go:GetReady.
+// Database-related codes (50xxx) — returned when a configured DB is
+// misbehaving or unreachable. See internal/handler/health.go:GetReady.
 const (
-	DBUnavailable Code = 50001 // db driver not configured (cfg.DB.Driver empty)
+	// Deprecated: an intentionally disabled database is not a readiness error.
+	// Keep this value reserved because public error codes must never be reused.
+	DBUnavailable Code = 50001
 	DBHandle      Code = 50002 // (*gorm.DB).DB() returned a non-nil error
 	DBPing        Code = 50003 // (*sql.DB).PingContext failed
 )

@@ -21,8 +21,13 @@ server:
     port: 8000
   # -- Pod resources (requests/limits). Empty = K8s defaults.
   resources: {}
+  # -- Existing Secret containing the complete config.yaml. When name is set,
+  # server.config is ignored and the ConfigMap is not created.
+  existingConfigSecret:
+    name: ""
+    key: config.yaml
   # -- server config.yaml content (multi-line YAML string). Mounted at /app/config.yaml
-  # Keep secrets (DSN, OTLP tokens) out of here — use a Secret + extraEnv or extraVolumes.
+  # Keep secrets out of values; use existingConfigSecret for production credentials.
   config: |
     server:
       http_addr: ":8000"

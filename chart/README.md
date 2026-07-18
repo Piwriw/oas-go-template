@@ -7,9 +7,9 @@ served by nginx) into Kubernetes.
 
 | Template | What |
 |----------|------|
-| `server-deployment.yaml` | Server Deployment — liveness on `/healthz`, readiness on `/readyz`, mounts `config.yaml` from a ConfigMap. |
+| `server-deployment.yaml` | Server Deployment — liveness on `/healthz`, readiness on `/readyz`, mounts `config.yaml` from a ConfigMap or existing Secret. |
 | `server-service.yaml` | ClusterIP Service exposing server on port `server.service.port` (default 8000). |
-| `server-configmap.yaml` | Holds `server.config` (a YAML string) — pod rolls when content changes via `checksum/config`. |
+| `server-configmap.yaml` | Holds `server.config` when no existing config Secret is selected — pod rolls when content changes via `checksum/config`. |
 | `web-deployment.yaml` | Optional frontend Deployment (nginx on port 8080). |
 | `web-service.yaml` | Optional frontend Service. |
 | `ingress.yaml` | Optional Ingress. Off by default; per-path backend selectable via `service` + `port` (e.g. `/` → web, `/api` → server). |
@@ -40,9 +40,9 @@ curl http://localhost:8000/healthz
 
 ## Config management
 
-`server.config` is a YAML string written to a ConfigMap and mounted at
-`/app/config.yaml`. The server reads it via the `-c /app/config.yaml` arg.
-Edit by overriding the value:
+The server always reads `/app/config.yaml` via its `-c` argument. For
+non-secret configuration, `server.config` is written to a ConfigMap and
+mounted at that path:
 
 ```yaml
 # values.prod.yaml
@@ -52,8 +52,8 @@ server:
       http_addr: ":8000"
       gin_mode: release
     db:
-      driver: postgres
-      dsn: ""        # populate from a Secret via env or extraVolumes, NOT here.
+      driver: ""
+      dsn: ""
     log:
       format: json
       level: info
@@ -66,9 +66,27 @@ server:
 helm upgrade my-release ./chart -f values.prod.yaml
 ```
 
-**Secrets stay out of `server.config`.** Use a Kubernetes Secret +
-`envFrom` / `extraVolumes` (extend the chart as needed), or an external
-secrets controller.
+For credentials, create or provision a Secret containing the complete YAML
+file, then select it through `server.existingConfigSecret`:
+
+```bash
+kubectl create secret generic my-server-config \
+  --namespace my-ns \
+  --from-file=config.yaml=./config.prod.yaml
+```
+
+```yaml
+# values.prod.yaml
+server:
+  existingConfigSecret:
+    name: my-server-config
+    key: config.yaml
+```
+
+When `name` is set, `server.config` is ignored and the chart does not create
+the server ConfigMap. The Secret must exist in the release namespace. A change
+to the Secret name or key rolls the Deployment; after a content-only update,
+restart the Deployment or use a reloader controller.
 
 ## Switching OTel on
 

@@ -80,7 +80,7 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 `internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout.
 
-`*gorm.DB` is injected via `handler.New(gdb)`; **`db` may be nil** and `/readyz` reports 503 in that case (graceful degradation, not panic). Use the same pattern for any new dependency.
+`*gorm.DB` is injected via `handler.New(gdb)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
 
 For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — see `internal/db/db_test.go`. With a connection pool, each connection otherwise gets its own private memory DB.
 
@@ -88,7 +88,7 @@ For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — se
 
 Two separate probes in `internal/handler/health.go`:
 - `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
-- `GET /readyz` — **readiness**. 200 only when configured deps are reachable (currently: `db.PingContext`); 503 when `db==nil` or ping fails. Don't add expensive checks to `/healthz`.
+- `GET /readyz` — **readiness**. 200 when all configured deps are reachable; a disabled DB is skipped, while a configured DB ping failure returns 503. Don't add expensive checks to `/healthz`.
 
 ### /metrics
 
@@ -107,5 +107,4 @@ Two separate probes in `internal/handler/health.go`:
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
 - **`os.Exit(0)` after defers**: gocritic's `exitAfterDefer` will fail lint. `main` returns through `run()` and exits via `os.Exit(1)` only on error — keep it that way.
 - **Empty OAS spec breaks the build**: keep at least one path and one schema in `spec/openapi.yaml`, otherwise `cmd/server/main.go` references symbols that no longer exist after `make gen`.
-- **`config.example.yaml` comments mention `env: HTTP_ADDR` etc.** but env overlay was removed — only YAML drives config. Treat those comment labels as legacy.
 - **OTel `semconv` version is pinned to v1.41.0** for a reason (matches SDK detectors — bumping it crashes resource init with a conflicting Schema URL error). Update only when you also bump `go.opentelemetry.io/otel`.

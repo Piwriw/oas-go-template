@@ -33,7 +33,7 @@ Frontend : {{ include "oas-go-template.fullname" . }}-web.{{ .Release.Namespace 
 {{- end }}
 {{- end }}
 
-{{- if eq .Values.server.config "" }}
+{{- if and (not .Values.server.existingConfigSecret.name) (eq .Values.server.config "") }}
 NOTE: server.config is empty — the pod boots with built-in defaults (debug
-mode, OTel disabled). Override via `helm upgrade -f values.<env>.yaml`.
+mode, OTel enabled). Override via `helm upgrade -f values.<env>.yaml`.
 {{- end }}
