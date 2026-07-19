@@ -26,7 +26,7 @@
 
 ## 技术栈
 
-- Go 1.25+
+- Go 1.26+
 - gin（HTTP 框架）
 - oapi-codegen v2（代码生成，StrictServerInterface 模式）
 - Gorm（ORM，支持 postgres/mysql/sqlite — 可选启用）
@@ -110,7 +110,7 @@ cp config.example.yaml config.yaml
 
 在 Kubernetes 中，可设置 Helm 的 `server.existingConfigSecret.name`，挂载包含完整 `config.yaml` 的 Secret。这样既保持仅 YAML 的配置模型，又能避免 DSN、exporter 凭据等密钥进入 chart values。
 
-HTTP 服务默认使用 5 秒读请求头超时、15 秒读超时、30 秒写超时、60 秒空闲超时，限制请求头为 1 MiB、请求体为 1 MiB。可在 `config.yaml` 的 `server` 下调整；流式响应可将 `write_timeout: 0`，应用层请求体限制可将 `max_body_bytes: 0` 关闭。
+HTTP 服务默认使用 5 秒读请求头超时、15 秒读超时、30 秒写超时、60 秒空闲超时和 5 秒优雅摘流窗口，限制请求头为 1 MiB、请求体为 1 MiB。收到关闭信号后，服务会先让 `/readyz` 返回 503，再等待 `drain_timeout` 后关闭监听器。可在 `config.yaml` 的 `server` 下调整；流式响应可将 `write_timeout: 0`，应用层请求体限制可将 `max_body_bytes: 0` 关闭。
 
 ## 数据库 (Gorm)
 

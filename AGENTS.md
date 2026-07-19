@@ -21,11 +21,12 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Format (goimports, three-group) | `make fmt` |
 | Security audit (govulncheck + gosec) | `make audit` |
 | OpenAPI breaking-change check | `make contract-check BASE_SPEC=...` |
+| Supply-chain pin check | `make supply-chain-check` |
 | Build server Docker image | `make docker` |
 | Build frontend Docker image | `make web-docker` |
 | Local Jaeger + OTel collector | `make dev-stack` / `make dev-stack-down` |
 
-`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`.
+`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`. The repository toolchain is Go `1.26.5`; `make supply-chain-check` verifies that version, explicit Docker tags, and GitHub Action SHAs remain aligned.
 
 ## Architecture
 
@@ -120,6 +121,11 @@ For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — se
 Two separate probes in `internal/handler/health.go`:
 - `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
 - `GET /readyz` — **readiness**. 200 when all configured deps are reachable; a disabled DB is skipped, while a configured DB ping failure returns 503. Don't add expensive checks to `/healthz`.
+
+During graceful shutdown, `handler.DrainState` flips readiness to 503 before
+`http.Server.Shutdown` begins. `server.drain_timeout` defaults to 5s so load
+balancers can observe the state change; keep the Helm
+`terminationGracePeriodSeconds` longer than that window.
 
 ### /metrics
 

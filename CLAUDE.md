@@ -96,6 +96,11 @@ Two separate probes in `internal/handler/health.go`:
 - `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
 - `GET /readyz` — **readiness**. 200 when all configured deps are reachable; a disabled DB is skipped, while a configured DB ping failure returns 503. Don't add expensive checks to `/healthz`.
 
+During graceful shutdown, `handler.DrainState` flips readiness to 503 before
+`http.Server.Shutdown` begins. `server.drain_timeout` defaults to 5s so load
+balancers can observe the state change; keep the Helm
+`terminationGracePeriodSeconds` longer than that window.
+
 ### /metrics
 
 `GET /metrics` is hardcoded in `cmd/server/main.go:newHTTPServer` and serves `promhttp.Handler()` from `prometheus.DefaultGatherer`. Always on, not configurable — it's an ops endpoint, not part of the API contract, and there's no good reason to disable it. Intentionally absent from `spec/openapi.yaml` so the client SDK doesn't carry a useless `GetMetrics*` method. Routed through the full middleware chain (otelgin + logging) — every scrape is traced and logged.

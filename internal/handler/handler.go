@@ -8,11 +8,17 @@ import "gorm.io/gorm"
 // db may be nil when the server boots without a configured database. Because
 // the dependency is intentionally disabled, /readyz still reports ready.
 type Handler struct {
-	db *gorm.DB
+	db         *gorm.DB
+	drainState *DrainState
 }
 
 // New returns a Handler wired to the given dependencies. Pass nil for any
 // dependency that isn't available; affected endpoints degrade gracefully.
-func New(gdb *gorm.DB) *Handler {
-	return &Handler{db: gdb}
+// An optional DrainState makes readiness fail before graceful shutdown.
+func New(gdb *gorm.DB, drainStates ...*DrainState) *Handler {
+	drainState := NewDrainState()
+	if len(drainStates) > 0 && drainStates[0] != nil {
+		drainState = drainStates[0]
+	}
+	return &Handler{db: gdb, drainState: drainState}
 }

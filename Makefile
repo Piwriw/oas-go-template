@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen tools contract-check build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen tools contract-check supply-chain-check build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -31,6 +31,9 @@ gen:  ## Generate code from spec/openapi.yaml
 
 contract-check:  ## Reject breaking OpenAPI changes against BASE_SPEC
 	go run github.com/tufin/oasdiff@$(OASDIFF_VERSION) breaking "$(BASE_SPEC)" spec/openapi.yaml --fail-on ERR
+
+supply-chain-check:  ## Verify exact Go, Docker image, and GitHub Action pins
+	./scripts/verify-pins.sh
 
 tools:  ## Install pinned developer tools
 	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION)

@@ -84,22 +84,27 @@ func run(configPath string) error {
 		shutdownOTel(otelShutdown)
 	}()
 
-	srv := newHTTPServer(cfg, gdb)
-	return serveAndWait(ctx, srv, stop)
+	drainState := handler.NewDrainState(cfg.Server.DrainTimeout)
+	srv := newHTTPServer(cfg, gdb, drainState)
+	return serveAndWait(ctx, srv, stop, drainState)
 }
 
 // newHTTPServer wires the gin router (recovery + otelgin + logging + optional
 // CORS + request body limit), validates API requests against the embedded OAS
 // document, registers the strict API handler, mounts the Prometheus /metrics
 // route, and applies HTTP timeouts and header limits to defuse common resource
-// attacks.
+// attacks. The optional DrainState makes readiness fail before shutdown.
 //
 // The OTel Prometheus exporter (when OTel is enabled in cfg.OTel.Enabled)
 // and client_golang's built-in Go/process collectors both feed
 // prometheus.DefaultRegisterer — /metrics reads from there via
 // promhttp.Handler. No explicit collector registration needed.
-func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
-	h := handler.New(gdb)
+func newHTTPServer(cfg *config.Config, gdb *gorm.DB, drainStates ...*handler.DrainState) *http.Server {
+	drainState := handler.NewDrainState(cfg.Server.DrainTimeout)
+	if len(drainStates) > 0 && drainStates[0] != nil {
+		drainState = drainStates[0]
+	}
+	h := handler.New(gdb, drainState)
 	strictHandler := internalapi.NewStrictHandlerWithOptions(h, nil, handler.StrictServerOptions())
 	swaggerSpec := openAPISpec()
 
@@ -160,9 +165,13 @@ func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
 
 // serveAndWait starts srv in a goroutine and blocks until either ctx is
 // canceled (signal) or ListenAndServe returns a non-ErrServerClosed error
-// (crash). Either way it then runs a 10s-bounded Shutdown. Returns the serve
-// error (nil on graceful signal-driven shutdown).
-func serveAndWait(ctx context.Context, srv *http.Server, stop context.CancelFunc) error {
+// (crash). On a signal it marks readiness as draining and waits for the
+// configured endpoint-removal window before a 10s-bounded Shutdown.
+func serveAndWait(ctx context.Context, srv *http.Server, stop context.CancelFunc, drainStates ...*handler.DrainState) error {
+	var drainState *handler.DrainState
+	if len(drainStates) > 0 {
+		drainState = drainStates[0]
+	}
 	serverErr := make(chan error, 1)
 	go func() {
 		slog.Info("server listening", "addr", srv.Addr, "version", version.Version)
@@ -179,7 +188,16 @@ func serveAndWait(ctx context.Context, srv *http.Server, stop context.CancelFunc
 	select {
 	case <-ctx.Done():
 		slog.Info("shutdown signal received, draining...")
+		if drainState != nil {
+			drainState.Begin()
+			if timeout := drainState.Timeout(); timeout > 0 {
+				time.Sleep(timeout)
+			}
+		}
 	case serveErr = <-serverErr:
+		if drainState != nil {
+			drainState.Begin()
+		}
 		slog.Error("server crashed", "err", serveErr)
 	}
 

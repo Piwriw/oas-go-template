@@ -21,7 +21,7 @@ jobs:
     # Only PRs need this — direct pushes to main have already been reviewed.
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # Need every commit in the PR, not just the head.
 
@@ -61,15 +61,19 @@ jobs:
       GOLANGCI_LINT_VERSION: v2.12.2
       HELM_VERSION: v3.16.2
       OASDIFF_VERSION: v1.10.28
+      GOTOOLCHAIN: local
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Verify immutable supply-chain pins
+        run: make supply-chain-check
 
       - name: Install golangci-lint
         run: |
@@ -77,9 +81,9 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Install helm
-        run: |
-          curl -fsSL -o /tmp/get_helm.sh "https://raw.githubusercontent.com/helm/helm/${HELM_VERSION}/scripts/get-helm-3"
-          chmod +x /tmp/get_helm.sh && /tmp/get_helm.sh --version "$HELM_VERSION" --no-sudo
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: ${{ env.HELM_VERSION }}
 
       - name: Verify golangci-lint config (v2 schema)
         run: golangci-lint config verify
@@ -127,12 +131,12 @@ jobs:
     runs-on: ubuntu-latest
     # Only validate the server image builds; full integration lives elsewhere.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Build server image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: build/Dockerfile

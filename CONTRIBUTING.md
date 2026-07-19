@@ -8,7 +8,7 @@ small.
 
 Requirements:
 
-- Go 1.25+
+- Go 1.26+
 - [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) v2.7.1 —
   installed by `scripts/gen.sh`, no separate install needed
 - `make`, `docker`, `helm` (only for chart changes), Node 22+ (only for `web/`)

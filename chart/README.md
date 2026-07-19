@@ -55,6 +55,7 @@ server:
       read_timeout: 15s
       write_timeout: 30s
       idle_timeout: 60s
+      drain_timeout: 5s
       max_header_bytes: 1048576
       max_body_bytes: 1048576
     db:
@@ -93,6 +94,11 @@ When `name` is set, `server.config` is ignored and the chart does not create
 the server ConfigMap. The Secret must exist in the release namespace. A change
 to the Secret name or key rolls the Deployment; after a content-only update,
 restart the Deployment or use a reloader controller.
+
+When a pod receives SIGTERM, the server marks `/readyz` unavailable, waits for
+`server.config.server.drain_timeout` (5s by default), and then closes its HTTP
+listener. Keep `server.terminationGracePeriodSeconds` longer than this drain
+window plus the shutdown timeout.
 
 ## Switching OTel on
 

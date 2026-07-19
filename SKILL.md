@@ -299,7 +299,7 @@ Generates `Version *string`, not `Version string`. Either add it to `required` o
 
 ### 4. `go mod tidy` raises the Go directive
 
-You wrote `go 1.23` in `go.mod`. After `go mod tidy`, it becomes `go 1.25.0` because some dependency requires it. This is normal — accept it. Update `build/Dockerfile`'s `FROM golang:X.Y-alpine` to match (otherwise the build fails with `go.mod requires go >= X.Y`).
+The repository pins Go `1.26.5` in `go.mod`, and `build/Dockerfile` uses the same exact toolchain version. Keep them aligned; `make supply-chain-check` rejects a drift and also verifies explicit Docker tags and GitHub Action SHAs.
 
 ### 5. semconv version must match the OTel SDK detectors
 

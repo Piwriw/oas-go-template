@@ -31,6 +31,7 @@ spec:
         {{- include "oas-go-template.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: server
     spec:
+      terminationGracePeriodSeconds: {{ .Values.server.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "oas-go-template.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

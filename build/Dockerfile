@@ -1,5 +1,5 @@
- # syntax=docker/dockerfile:1.7
-FROM golang:1.26-alpine AS builder
+# syntax=docker/dockerfile:1.7
+FROM golang:1.26.5-alpine AS builder
 
 # Allow overriding GOPROXY for builds in restricted networks (e.g. behind GFW).
 # Default uses the standard Go module proxy.

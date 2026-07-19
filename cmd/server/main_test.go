@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	internalapi "github.com/piwriw/oas-go-template/internal/api"
 	"github.com/piwriw/oas-go-template/internal/config"
 	"github.com/piwriw/oas-go-template/internal/errcode"
+	"github.com/piwriw/oas-go-template/internal/handler"
 )
 
 func testConfig() *config.Config {
@@ -29,6 +31,20 @@ func testConfig() *config.Config {
 			MaxHeaderBytes:    2048,
 			MaxBodyBytes:      1024,
 		},
+	}
+}
+
+func TestServeAndWaitMarksReadinessDrainingBeforeShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	drainState := handler.NewDrainState(0)
+	srv := &http.Server{Addr: "127.0.0.1:0"}
+
+	if err := serveAndWait(ctx, srv, func() {}, drainState); err != nil {
+		t.Fatalf("serveAndWait() error = %v", err)
+	}
+	if !drainState.Draining() {
+		t.Fatal("serveAndWait() did not mark readiness as draining")
 	}
 }
 
@@ -61,6 +77,26 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReadinessReturns503WhileDraining(t *testing.T) {
+	drainState := handler.NewDrainState(0)
+	srv := newHTTPServer(testConfig(), nil, drainState)
+	drainState.Begin()
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body internalapi.Error
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode readiness error: %v", err)
+	}
+	if body.Code != int32(errcode.ServiceDraining) || body.Message != "service is shutting down" {
+		t.Errorf("body=%+v", body)
 	}
 }
 

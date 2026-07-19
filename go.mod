@@ -1,6 +1,6 @@
 module github.com/piwriw/oas-go-template
 
-go 1.25.0
+go 1.26.5
 
 require (
 	github.com/getkin/kin-openapi v0.140.0

@@ -28,6 +28,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
   response headers for deprecated operations.
 - A pinned `oasdiff` compatibility check via `make contract-check`, enforced on
   pull requests against the target branch's OpenAPI contract.
+- A single Go 1.26.5 toolchain across `go.mod`, local checks, CI, and the
+  backend builder image.
+- Explicitly versioned Docker base-image tags and immutable GitHub Actions
+  references, plus `make supply-chain-check` to detect pin drift.
+- Graceful Kubernetes shutdown: readiness switches to 503 before the server
+  waits for the configured drain window and closes listeners.
 
 ### Changed
 
@@ -37,8 +43,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
   non-root Pod security defaults.
 - Structured error logging that keeps internal details and panic stack traces
   out of public responses.
+- CI now uses a SHA-pinned `setup-helm` action instead of executing a mutable
+  remote installer script.
 - Server startup now rejects paths that violate the API versioning policy or
   deprecated operations with incomplete/invalid sunset metadata.
+- Helm deployments now expose `terminationGracePeriodSeconds` for the drain
+  window.
 
 ### Fixed
 

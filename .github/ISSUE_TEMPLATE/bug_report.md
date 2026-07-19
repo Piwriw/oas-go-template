@@ -31,7 +31,7 @@ body:
     attributes:
       label: Go version
       description: Output of `go version`.
-      placeholder: "go1.25.0 darwin/arm64"
+      placeholder: "go1.26.5 darwin/arm64"
     validations:
       required: true
   - type: textarea

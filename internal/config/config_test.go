@@ -26,6 +26,7 @@ server:
   read_timeout: 20s
   write_timeout: 40s
   idle_timeout: 90s
+  drain_timeout: 7s
   max_header_bytes: 2048
   max_body_bytes: 4096
 db:
@@ -103,6 +104,7 @@ server:
   read_timeout: 20s
   write_timeout: 40s
   idle_timeout: 90s
+  drain_timeout: 7s
   max_header_bytes: 2048
   max_body_bytes: 4096
 `)
@@ -115,6 +117,9 @@ server:
 	}
 	if cfg.Server.WriteTimeout != 40*time.Second || cfg.Server.IdleTimeout != 90*time.Second {
 		t.Errorf("write/idle timeouts = %v/%v", cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
+	}
+	if cfg.Server.DrainTimeout != 7*time.Second {
+		t.Errorf("drain timeout = %v", cfg.Server.DrainTimeout)
 	}
 	if cfg.Server.MaxHeaderBytes != 2048 || cfg.Server.MaxBodyBytes != 4096 {
 		t.Errorf("request limits = %d/%d", cfg.Server.MaxHeaderBytes, cfg.Server.MaxBodyBytes)
@@ -136,6 +141,9 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	}
 	if cfg.Server.WriteTimeout != 30*time.Second || cfg.Server.IdleTimeout != 60*time.Second {
 		t.Errorf("default write/idle timeouts = %v/%v", cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
+	}
+	if cfg.Server.DrainTimeout != 5*time.Second {
+		t.Errorf("default drain timeout = %v", cfg.Server.DrainTimeout)
 	}
 	if cfg.Server.MaxHeaderBytes != 1<<20 || cfg.Server.MaxBodyBytes != 1<<20 {
 		t.Errorf("default request limits = %d/%d", cfg.Server.MaxHeaderBytes, cfg.Server.MaxBodyBytes)
@@ -214,6 +222,7 @@ log:
 func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
 	tests := map[string]string{
 		"read timeout":     "read_timeout: -1s",
+		"drain timeout":    "drain_timeout: -1s",
 		"max header bytes": "max_header_bytes: -1",
 		"max body bytes":   "max_body_bytes: -1",
 	}
