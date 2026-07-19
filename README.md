@@ -97,11 +97,12 @@ For a project you've already initialized (or to explore the template itself):
 
 ```bash
 make gen       # regenerate *.gen.go (pinned oapi-codegen v2.7.1)
+make tools     # install pinned developer tools
 make build     # build cmd/server and cmd/client into bin/
 make run       # go run cmd/server with version ldflags
 make test      # go test -race -cover ./...
 make lint      # golangci-lint v2 (excludes *.gen.go, forbids legacy log)
-make audit     # govulncheck + gosec (CI gate; non-zero on any finding)
+make audit     # govulncheck v1.6.0 + gosec v2.27.1 (CI gate)
 make docker    # build server image (pass GOPROXY=... if behind GFW)
 ```
 

@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen tools build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -11,11 +11,23 @@ LDFLAGS     := -X $(VERSION_PKG).Version=$(VERSION) \
                -X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) \
                -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
 
+# Pin developer and security tools so local checks and CI stay reproducible.
+OAPI_CODEGEN_VERSION ?= v2.7.1
+GOLANGCI_LINT_VERSION ?= v2.12.2
+GOVULNCHECK_VERSION ?= v1.6.0
+GOSEC_VERSION ?= v2.27.1
+AIR_VERSION ?= v1.66.0
+
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 gen:  ## Generate code from spec/openapi.yaml
-	./scripts/gen.sh
+	OAPI_CODEGEN_VERSION=$(OAPI_CODEGEN_VERSION) ./scripts/gen.sh
+
+tools:  ## Install pinned developer tools
+	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION)
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	go install github.com/air-verse/air@$(AIR_VERSION)
 
 build:  ## Build server and client binaries into ./bin (with version ldflags)
 	mkdir -p bin
@@ -38,8 +50,8 @@ fmt:  ## Format Go code with goimports (gofmt + import grouping)
 	goimports -local github.com/piwriw/oas-go-template -w .
 
 audit:  ## Scan dependencies (govulncheck) and source (gosec) for security issues
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-	go run github.com/securego/gosec/v2/cmd/gosec@latest -quiet ./...
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+	go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
 
 docker:  ## Build server docker image (override GOPROXY via env if behind restricted network)
 	docker build \
@@ -59,7 +71,7 @@ helm-lint:  ## Lint the Helm chart (requires helm 3)
 helm-template:  ## Render chart templates locally for inspection (no cluster needed)
 	helm template oas-go-template chart/ | less
 
-dev:  ## Run server with live reload (requires air: go install github.com/air-verse/air@latest)
+dev:  ## Run server with live reload (run make tools first)
 	air
 
 web-dev:  ## Run frontend dev server

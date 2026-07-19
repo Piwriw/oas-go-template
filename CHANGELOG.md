@@ -17,8 +17,27 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Configurable HTTP read, write, idle, header, and request-body limits.
 - Typed client response fields for standard 400, 404, 405, 413, and 500 API
   errors.
+- Configurable CORS policy with preflight handling, credentials, exposed
+  headers, and stable typed 403 responses for disallowed origins.
+- An extensible global Gin middleware chain with a documented custom-handler
+  extension point.
+- `make tools` for installing pinned versions of the development tools.
+
+### Changed
+
+- CI now uses pinned versions of code generation, lint, security scanning, and
+  Helm tooling instead of floating `latest` versions.
+- Helm defaults now disable OTel when no collector is deployed and apply safer
+  non-root Pod security defaults.
 - Structured error logging that keeps internal details and panic stack traces
   out of public responses.
+
+### Fixed
+
+- Readiness responses no longer expose raw database driver errors; detailed
+  diagnostics remain in server logs.
+- Upgraded transitive PostgreSQL and ClickHouse dependencies to versions that
+  address the vulnerabilities reported by the pinned security audit.
 
 ## [0.1.0] - 2026-07-19
 

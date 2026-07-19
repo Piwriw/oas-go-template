@@ -84,11 +84,12 @@ author 的值再继续。
 
 ```bash
 make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go（固定 oapi-codegen v2.7.1）
+make tools     # 安装固定版本的开发工具
 make build     # 编译 cmd/server 和 cmd/client 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server
 make test      # go test -race -cover ./...
 make lint      # golangci-lint v2（排除 *.gen.go，禁止 legacy log 包）
-make audit     # govulncheck + gosec（CI 门禁；任一发现即非零退出）
+make audit     # govulncheck v1.6.0 + gosec v2.27.1（CI 门禁）
 make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 ```
 
