@@ -16,7 +16,7 @@ RUN npm run build
 
 # Runtime: nginx-unprivileged binds 8080 as non-root, matching the
 # backend Dockerfile's non-root stance.
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 
 # SPA-aware nginx config: try_files falls back to index.html so future
 # client-side routes resolve on direct hits / refresh.
