@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Builder: install deps (cached layer) and run vite build → ./dist
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /src
 
