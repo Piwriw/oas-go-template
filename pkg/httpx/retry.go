@@ -61,7 +61,7 @@ func (p RetryPolicy) backoff(attempt int) time.Duration {
 	if p.Jitter > 0 {
 		// ±Jitter fraction
 		delta := d * p.Jitter
-		d = d - delta + 2*delta*rand.Float64()
+		d = d - delta + 2*delta*rand.Float64() // #nosec G404 -- jitter only spreads retry timing; it is not security-sensitive.
 	}
 	return time.Duration(d)
 }

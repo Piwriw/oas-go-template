@@ -40,6 +40,24 @@ make audit      # govulncheck v1.6.0 + gosec v2.27.1
 - If `make gen` produces a diff on a clean tree, generation isn't idempotent —
   fix the spec or the generator config before opening a PR.
 
+## API versioning and deprecation
+
+- Keep `/healthz`, `/readyz`, and `/version` unversioned; they are operational
+  probe contracts. Put every new business path under `/vN/`.
+- For a deprecated operation, set `deprecated: true`,
+  `x-deprecation-date`, and `x-sunset-date` to RFC3339 timestamps. The sunset
+  must be later than the deprecation date. Runtime middleware emits matching
+  `Deprecation` and `Sunset` response headers.
+- Do not remove or make an existing operation stricter without either adding a
+  new `/vN` contract or documenting an approved migration. PR CI runs the
+  pinned `oasdiff` check against the target branch's OpenAPI document.
+
+For a local check, provide the prior contract explicitly:
+
+```bash
+make contract-check BASE_SPEC=/path/to/openapi-base.yaml
+```
+
 ## Commit messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
@@ -79,6 +97,8 @@ and must match your git identity.
 
 - [ ] `make lint test audit` passes locally
 - [ ] `make gen` produces no diff (codegen is idempotent)
+- [ ] `make contract-check BASE_SPEC=/path/to/openapi-base.yaml` passes, or
+      the PR explains the version/migration strategy for an intentional break
 - [ ] New endpoints have handler implementations, not just generated stubs
 - [ ] No secrets, real DSNs, or customer data in commits
 - [ ] If you changed `spec/openapi.yaml`, the regenerated `*.gen.go` are

@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen tools build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen tools contract-check build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -17,12 +17,20 @@ GOLANGCI_LINT_VERSION ?= v2.12.2
 GOVULNCHECK_VERSION ?= v1.6.0
 GOSEC_VERSION ?= v2.27.1
 AIR_VERSION ?= v1.66.0
+OASDIFF_VERSION ?= v1.10.28
+
+# BASE_SPEC may point to the API contract from the merge base in CI. Locally,
+# the default makes the target a useful no-op smoke check.
+BASE_SPEC ?= spec/openapi.yaml
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 gen:  ## Generate code from spec/openapi.yaml
 	OAPI_CODEGEN_VERSION=$(OAPI_CODEGEN_VERSION) ./scripts/gen.sh
+
+contract-check:  ## Reject breaking OpenAPI changes against BASE_SPEC
+	go run github.com/tufin/oasdiff@$(OASDIFF_VERSION) breaking "$(BASE_SPEC)" spec/openapi.yaml --fail-on ERR
 
 tools:  ## Install pinned developer tools
 	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION)

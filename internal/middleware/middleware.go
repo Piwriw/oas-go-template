@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	ginCors "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -16,6 +17,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/config"
 	"github.com/piwriw/oas-go-template/internal/handler"
 	"github.com/piwriw/oas-go-template/internal/logging"
+	"github.com/piwriw/oas-go-template/internal/oas"
 )
 
 // Options contains the settings needed to build the global middleware chain.
@@ -25,6 +27,7 @@ type Options struct {
 	ServiceName  string
 	MaxBodyBytes int64
 	CORS         config.CORSConfig
+	OpenAPISpec  *openapi3.T
 }
 
 // Handlers returns the global middleware chain in its required order.
@@ -40,7 +43,18 @@ func Handlers(opts Options, additional ...gin.HandlerFunc) []gin.HandlerFunc {
 		handlers = append(handlers, cors(opts.CORS))
 	}
 	handlers = append(handlers, handler.BodyLimit(opts.MaxBodyBytes))
+	if opts.OpenAPISpec != nil {
+		handlers = append(handlers, deprecation(opts.OpenAPISpec))
+	}
 	return append(handlers, additional...)
+}
+
+func deprecation(spec *openapi3.T) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		op := oas.FindOperation(spec, c.FullPath(), c.Request.Method)
+		oas.ApplyDeprecationHeaders(c, op)
+		c.Next()
+	}
 }
 
 func cors(cfg config.CORSConfig) gin.HandlerFunc {

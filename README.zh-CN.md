@@ -20,6 +20,7 @@
 - [数据库 (Gorm)](#数据库-gorm)
 - [本地可观测性栈](#本地可观测性栈)
 - [日常开发流程](#日常开发流程)
+- [API 契约](#api-契约)
 - [变更日志](CHANGELOG.zh-CN.md)
 - [License](#license)
 
@@ -175,6 +176,29 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 4. 跑 `make build && ./bin/server`。
 
 如果漏写了某个 handler 方法，`internal/handler/handler_test.go` 里的编译期断言 `var _ api.StrictServerInterface = (*Handler)(nil)` 会让构建失败，并列出所有缺失的方法。
+
+## API 契约
+
+API 使用 URL 前缀版本化。由于 Kubernetes 和负载均衡器依赖稳定地址，运维探针 `/healthz`、`/readyz` 和 `/version` 保持不带版本；后续业务接口必须放在 `/vN/` 下（例如 `/v1/orders`）。这项规则由 `spec/openapi.yaml` 中的 `x-api-version` 和 `x-versioning` 声明，并在服务启动时校验。
+
+弃用接口时设置 `deprecated: true`，并提供 RFC3339 格式的两个日期扩展：
+
+```yaml
+deprecated: true
+x-deprecation-date: "2026-08-01T00:00:00Z"
+x-sunset-date: "2027-02-01T00:00:00Z"
+```
+
+服务会校验下线日期晚于弃用日期，并在响应中加入对应的 `Deprecation` 和 `Sunset` 响应头。接口应持续可用到下线日期；提前删除会被视为破坏性变更。
+启用 CORS 时，如果浏览器客户端需要读取这些响应头，请将它们加入 `cors.expose_headers`。
+
+本地可以把当前契约与基线文件比较：
+
+```bash
+make contract-check BASE_SPEC=/path/to/openapi-base.yaml
+```
+
+Pull request 会自动使用目标分支的 spec，并通过固定版本的 `oasdiff` v1.10.28 执行同一检查。确实需要破坏性变更时，应创建新的 `/vN` API 版本并提供明确的迁移方案。
 
 ## License
 

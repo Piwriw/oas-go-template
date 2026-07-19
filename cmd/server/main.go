@@ -26,6 +26,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/handler"
 	"github.com/piwriw/oas-go-template/internal/logging"
 	"github.com/piwriw/oas-go-template/internal/middleware"
+	oascontract "github.com/piwriw/oas-go-template/internal/oas"
 	"github.com/piwriw/oas-go-template/internal/otel"
 	"github.com/piwriw/oas-go-template/internal/version"
 	specapi "github.com/piwriw/oas-go-template/pkg/api"
@@ -100,6 +101,7 @@ func run(configPath string) error {
 func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	h := handler.New(gdb)
 	strictHandler := internalapi.NewStrictHandlerWithOptions(h, nil, handler.StrictServerOptions())
+	swaggerSpec := openAPISpec()
 
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
@@ -107,6 +109,7 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 		ServiceName:  serviceName,
 		MaxBodyBytes: cfg.Server.MaxBodyBytes,
 		CORS:         cfg.CORS,
+		OpenAPISpec:  swaggerSpec,
 	})
 	r.NoRoute(handler.NoRoute)
 	r.NoMethod(handler.NoMethod)
@@ -119,7 +122,7 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 
 	// Keep the operational /metrics route outside the OAS validator because it
 	// is intentionally not part of the public API contract.
-	apiRoutes := r.Group("", openAPIValidator(openAPISpec()))
+	apiRoutes := r.Group("", openAPIValidator(swaggerSpec))
 	internalapi.RegisterHandlers(apiRoutes, strictHandler)
 
 	return &http.Server{
@@ -140,6 +143,9 @@ func openAPISpec() (swaggerSpec *openapi3.T) {
 	swaggerSpec, err := specapi.GetSpec()
 	if err != nil {
 		panic(fmt.Sprintf("load embedded OpenAPI spec: %v", err))
+	}
+	if err := oascontract.Validate(swaggerSpec); err != nil {
+		panic(fmt.Sprintf("validate embedded OpenAPI contract: %v", err))
 	}
 	swaggerSpec.Servers = nil
 	return swaggerSpec

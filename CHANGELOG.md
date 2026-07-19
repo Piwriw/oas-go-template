@@ -22,6 +22,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - An extensible global Gin middleware chain with a documented custom-handler
   extension point.
 - `make tools` for installing pinned versions of the development tools.
+- URL-prefix API versioning policy for business endpoints, with unversioned
+  operational probe exceptions documented in the OpenAPI contract.
+- OpenAPI deprecation metadata validation and runtime `Deprecation` / `Sunset`
+  response headers for deprecated operations.
+- A pinned `oasdiff` compatibility check via `make contract-check`, enforced on
+  pull requests against the target branch's OpenAPI contract.
 
 ### Changed
 
@@ -31,6 +37,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
   non-root Pod security defaults.
 - Structured error logging that keeps internal details and panic stack traces
   out of public responses.
+- Server startup now rejects paths that violate the API versioning policy or
+  deprecated operations with incomplete/invalid sunset metadata.
 
 ### Fixed
 

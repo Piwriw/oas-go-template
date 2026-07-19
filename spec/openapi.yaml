@@ -3,7 +3,15 @@ info:
   title: oas-go-template API
   version: 0.1.0
   description: |
-    Template project API. Replace with your own spec.
+    Template project API. System probes remain unversioned for Kubernetes and
+    load balancers; all future business endpoints must use a /vN URL prefix.
+x-api-version: v1
+x-versioning:
+  strategy: url-prefix
+  unversioned_paths:
+    - /healthz
+    - /readyz
+    - /version
 servers:
   - url: http://localhost:8000
     description: local dev

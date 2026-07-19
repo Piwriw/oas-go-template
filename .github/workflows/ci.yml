@@ -60,8 +60,11 @@ jobs:
     env:
       GOLANGCI_LINT_VERSION: v2.12.2
       HELM_VERSION: v3.16.2
+      OASDIFF_VERSION: v1.10.28
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
@@ -89,6 +92,12 @@ jobs:
             git diff --stat
             exit 1
           fi
+
+      - name: OpenAPI breaking-change check
+        if: github.event_name == 'pull_request'
+        run: |
+          git show "origin/${{ github.event.pull_request.base.ref }}:spec/openapi.yaml" > /tmp/openapi-base.yaml
+          make contract-check BASE_SPEC=/tmp/openapi-base.yaml
 
       - name: go.mod / go.sum sync
         run: |

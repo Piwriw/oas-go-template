@@ -18,12 +18,16 @@
 - 可配置的 CORS 策略，支持预检请求、凭据、暴露响应头，并为被拒绝的来源返回稳定的类型化 403 响应。
 - 可扩展的全局 Gin middleware 链，并提供明确的自定义 middleware 扩展入口。
 - `make tools` 命令，用于安装固定版本的开发工具。
+- 面向业务接口的 URL 前缀 API 版本化策略；OpenAPI 契约明确列出保持不带版本的运维探针。
+- 弃用接口的 OpenAPI 元数据校验，以及运行时 `Deprecation` / `Sunset` 响应头。
+- 固定 `oasdiff` 版本的 `make contract-check` 契约兼容性检查，并在 pull request 中与目标分支契约比较。
 
 ### 变更
 
 - CI 改为使用固定版本的代码生成、lint、安全扫描和 Helm 工具，不再依赖浮动的 `latest` 版本。
 - Helm 默认在没有 collector 时关闭 OTel，并启用更安全的 non-root Pod 安全默认值。
 - 结构化错误日志：内部错误详情和 panic 堆栈只记录在日志中，不返回给外部调用方。
+- 服务启动时会拒绝不符合版本化规则的路径，以及缺少或包含无效下线日期的弃用接口。
 
 ### 修复
 

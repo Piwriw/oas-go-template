@@ -20,6 +20,7 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Lint (golangci-lint v2) | `make lint` |
 | Format (goimports, three-group) | `make fmt` |
 | Security audit (govulncheck + gosec) | `make audit` |
+| OpenAPI breaking-change check | `make contract-check BASE_SPEC=...` |
 | Build server Docker image | `make docker` |
 | Build frontend Docker image | `make web-docker` |
 | Local Jaeger + OTel collector | `make dev-stack` / `make dev-stack-down` |
@@ -44,6 +45,25 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 
 **Never hand-edit `*.gen.go`.** They are committed (not gitignored) so reviewers and IDEs see what's compiled.
 
+### API versioning and deprecation
+
+`spec/openapi.yaml` declares the API policy with `x-api-version: v1` and
+`x-versioning.strategy: url-prefix`. `/healthz`, `/readyz`, and `/version` are
+explicit unversioned operational exceptions; every future business path must
+use a `/vN/` prefix. `internal/oas` validates this policy at startup.
+
+For a deprecated operation, set `deprecated: true` and provide RFC3339
+`x-deprecation-date` and `x-sunset-date` extensions. The sunset must be later
+than the deprecation date. The global middleware resolves the matched Gin route
+against the embedded OAS operation and emits `Deprecation` and `Sunset`
+response headers. Keep the operation available until sunset; removing it
+earlier is a breaking contract change.
+
+`make contract-check BASE_SPEC=/path/to/openapi-base.yaml` runs pinned
+`oasdiff` v1.10.28. Pull request CI supplies the target branch's spec as the
+baseline and fails on ERR-level breaking changes. Intentional breaking changes
+require a new `/vN` API version and a migration plan.
+
 ### StrictServerInterface pattern
 
 Handlers in `internal/handler/` implement `api.StrictServerInterface` — a generated interface where each method returns a typed `ResponseObject` (`GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc.). The constructor `api.NewStrictHandler(h, nil)` wraps them; `api.RegisterHandlers(r, strictHandler)` mounts them on gin. There is a compile-time check `var _ api.StrictServerInterface = (*Handler)(nil)` in `internal/handler/handler_test.go` so missing methods fail the build.
@@ -52,15 +72,22 @@ Response type names come from the OAS status code + schema — **only use names 
 
 ### Request lifecycle and middleware ordering
 
-`cmd/server/main.go:newHTTPServer` wires the chain in this exact order:
+`cmd/server/main.go:newHTTPServer` calls `middleware.Use`, which wires the
+built-in chain in this order:
 
 ```go
-r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(cfg.Server.MaxBodyBytes))
+middleware.Use(r, middleware.Options{
+    ServiceName: serviceName, MaxBodyBytes: cfg.Server.MaxBodyBytes,
+    CORS: cfg.CORS, OpenAPISpec: spec,
+})
+```
+
+That expands to recovery, OTel, logging, optional CORS, body limit, and
+optional OAS deprecation headers in that order.
 
 Generated API routes add the embedded OAS request validator and use
 `handler.StrictServerOptions()` for the common `api.Error` response. The
 operational `/metrics` route remains outside the OAS validator group.
-```
 
 `otelgin` must run **before** `logging.Middleware` — logging reads the active span from `c.Request.Context()` to inject `trace_id` / `span_id` into each slog record (see `internal/logging/logging.go:otelHandler`). Reverse the order and trace context silently disappears from logs.
 

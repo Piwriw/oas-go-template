@@ -26,6 +26,7 @@ golangci-lint v2 config, and a Vite + React + TS frontend (deployed separately).
 - [Database (Gorm)](#database-gorm)
 - [Local Observability Stack](#local-observability-stack)
 - [Daily Workflow](#daily-workflow)
+- [API Contract](#api-contract)
 - [Changelog](CHANGELOG.md)
 - [License](#license)
 
@@ -214,6 +215,41 @@ If a handler method is missing, the compile-time assertion
 `var _ api.StrictServerInterface = (*Handler)(nil)` in
 `internal/handler/handler_test.go` fails the build with a clear error listing
 every missing method.
+
+## API Contract
+
+The API uses URL-prefix versioning. The operational probes `/healthz`,
+`/readyz`, and `/version` stay unversioned because Kubernetes and load
+balancers depend on those stable URLs. Every future business endpoint must be
+under `/vN/` (for example, `/v1/orders`); the policy is declared by
+`x-api-version` and `x-versioning` in `spec/openapi.yaml` and validated at
+server startup.
+
+To deprecate an operation, set `deprecated: true` and provide both dates as
+RFC3339 extensions:
+
+```yaml
+deprecated: true
+x-deprecation-date: "2026-08-01T00:00:00Z"
+x-sunset-date: "2027-02-01T00:00:00Z"
+```
+
+The server validates that the sunset is later than the deprecation date and
+adds matching `Deprecation` and `Sunset` response headers. Keep the operation
+available until its sunset date; removing it earlier is a breaking change.
+When CORS is enabled, add these names to `cors.expose_headers` if browser
+clients need to read them.
+
+For a local compatibility check, compare the current contract with a known
+baseline:
+
+```bash
+make contract-check BASE_SPEC=/path/to/openapi-base.yaml
+```
+
+Pull requests run the same check automatically against the target branch's
+specification using pinned `oasdiff` v1.10.28. Intentional breaking changes
+must be accompanied by a new `/vN` API version and an explicit migration plan.
 
 ## License
 
