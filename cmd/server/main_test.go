@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,11 +42,31 @@ func TestServeAndWaitMarksReadinessDrainingBeforeShutdown(t *testing.T) {
 	drainState := handler.NewDrainState(0)
 	srv := &http.Server{Addr: "127.0.0.1:0"}
 
-	if err := serveAndWait(ctx, srv, func() {}, drainState); err != nil {
+	if err := serveAndWait(ctx, srv, drainState); err != nil {
 		t.Fatalf("serveAndWait() error = %v", err)
 	}
 	if !drainState.Draining() {
 		t.Fatal("serveAndWait() did not mark readiness as draining")
+	}
+}
+
+func TestServeAndWaitListenErrorTakesPriorityOverCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	wantErr := errors.New("listen failed")
+	drainState := handler.NewDrainState(time.Hour)
+	srv := &http.Server{Addr: "127.0.0.1:8000"}
+	listen := func(_, _ string) (net.Listener, error) {
+		return nil, wantErr
+	}
+
+	err := serveAndWaitWithListener(ctx, srv, listen, drainState)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("serveAndWaitWithListener() error = %v, want %v", err, wantErr)
+	}
+	if drainState.Draining() {
+		t.Fatal("listen failure incorrectly entered the signal drain path")
 	}
 }
 

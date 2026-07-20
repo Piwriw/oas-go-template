@@ -52,6 +52,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Outbound retries no longer wait after the final attempt or consume the final
+  error response body before callers can inspect it.
+- HTTP listener startup failures are returned deterministically instead of
+  racing with graceful-shutdown cancellation and potentially exiting cleanly.
 - Readiness responses no longer expose raw database driver errors; detailed
   diagnostics remain in server logs.
 - Upgraded transitive PostgreSQL and ClickHouse dependencies to versions that

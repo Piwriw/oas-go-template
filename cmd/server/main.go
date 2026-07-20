@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -86,7 +87,7 @@ func run(configPath string) error {
 
 	drainState := handler.NewDrainState(cfg.Server.DrainTimeout)
 	srv := newHTTPServer(cfg, gdb, drainState)
-	return serveAndWait(ctx, srv, stop, drainState)
+	return serveAndWait(ctx, srv, drainState)
 }
 
 // newHTTPServer wires the gin router (recovery + otelgin + logging + optional
@@ -163,28 +164,42 @@ func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
 	})
 }
 
-// serveAndWait starts srv in a goroutine and blocks until either ctx is
-// canceled (signal) or ListenAndServe returns a non-ErrServerClosed error
-// (crash). On a signal it marks readiness as draining and waits for the
-// configured endpoint-removal window before a 10s-bounded Shutdown.
-func serveAndWait(ctx context.Context, srv *http.Server, stop context.CancelFunc, drainStates ...*handler.DrainState) error {
+// serveAndWait opens the listener before entering the signal wait so bind and
+// startup failures are returned directly instead of racing with cancellation.
+func serveAndWait(ctx context.Context, srv *http.Server, drainStates ...*handler.DrainState) error {
+	return serveAndWaitWithListener(ctx, srv, net.Listen, drainStates...)
+}
+
+// serveAndWaitWithListener starts srv and blocks until either ctx is canceled
+// or Serve exits. On a signal it marks readiness as draining, waits for the
+// configured endpoint-removal window, and then runs a 10s-bounded Shutdown.
+// listen is injectable so startup failures can be tested without port races.
+func serveAndWaitWithListener(
+	ctx context.Context,
+	srv *http.Server,
+	listen func(network, address string) (net.Listener, error),
+	drainStates ...*handler.DrainState,
+) error {
 	var drainState *handler.DrainState
 	if len(drainStates) > 0 {
 		drainState = drainStates[0]
 	}
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":http"
+	}
+	listener, err := listen("tcp", addr)
+	if err != nil {
+		slog.Error("server listen failed", "addr", addr, "err", err)
+		return err
+	}
+
 	serverErr := make(chan error, 1)
+	slog.Info("server listening", "addr", listener.Addr().String(), "version", version.Version)
 	go func() {
-		slog.Info("server listening", "addr", srv.Addr, "version", version.Version)
-		err := srv.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			// Trigger ctx cancel so the main goroutine runs Shutdown / Close in
-			// order instead of panicking past defers.
-			serverErr <- err
-			stop()
-		}
+		serverErr <- srv.Serve(listener)
 	}()
 
-	var serveErr error
 	select {
 	case <-ctx.Done():
 		slog.Info("shutdown signal received, draining...")
@@ -194,11 +209,12 @@ func serveAndWait(ctx context.Context, srv *http.Server, stop context.CancelFunc
 				time.Sleep(timeout)
 			}
 		}
-	case serveErr = <-serverErr:
-		if drainState != nil {
-			drainState.Begin()
+	case serveErr := <-serverErr:
+		if serveErr == nil || errors.Is(serveErr, http.ErrServerClosed) {
+			return nil
 		}
 		slog.Error("server crashed", "err", serveErr)
+		return serveErr
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -206,8 +222,13 @@ func serveAndWait(ctx context.Context, srv *http.Server, stop context.CancelFunc
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("http shutdown error", "err", err)
 	}
+	serveErr := <-serverErr
+	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+		slog.Error("server stopped with error during shutdown", "err", serveErr)
+		return serveErr
+	}
 
-	return serveErr
+	return nil
 }
 
 // shutdownOTel runs the otel shutdown func with a fresh 10s timeout when one

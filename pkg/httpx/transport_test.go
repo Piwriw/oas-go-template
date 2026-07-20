@@ -37,6 +37,12 @@ func closeBody(t *testing.T, resp *http.Response) {
 	_ = resp.Body.Close()
 }
 
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
 func TestLogTransport_2xx_Info(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -347,6 +353,46 @@ func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want 503", resp.StatusCode)
+	}
+}
+
+func TestRetryTransport_FinalAttemptReturnsImmediatelyWithReadableBody(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var calls int
+	parent := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		calls++
+		header := make(http.Header)
+		if calls == 2 {
+			header.Set("Retry-After", "3600")
+			cancel()
+		}
+		return &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Header:     header,
+			Body:       io.NopCloser(strings.NewReader("upstream still unavailable")),
+			Request:    req,
+		}, nil
+	})
+	policy := RetryPolicy{MaxAttempts: 2}
+	rt := retryTransport{parent: parent, policy: policy}
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.test", nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		closeBody(t, resp)
+		t.Fatalf("RoundTrip err: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if calls != 2 {
+		t.Errorf("calls = %d, want 2", calls)
+	}
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		t.Fatalf("read final response body: %v", readErr)
+	}
+	if got, want := string(body), "upstream still unavailable"; got != want {
+		t.Errorf("body = %q, want %q", got, want)
 	}
 }
 

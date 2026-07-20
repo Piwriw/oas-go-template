@@ -130,6 +130,11 @@ func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if !t.policy.shouldRetry(req.Method, status, err) {
 			return resp, err
 		}
+		// The final response belongs to the caller. Only consume it when
+		// another attempt will actually be made.
+		if attempt == t.policy.MaxAttempts-1 {
+			return resp, err
+		}
 
 		// Drain body so the connection can be reused.
 		if resp != nil && resp.Body != nil {
