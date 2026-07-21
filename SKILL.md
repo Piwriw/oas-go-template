@@ -84,7 +84,7 @@ The script derives the OLD module path and short name from `go.mod` — it has n
 
 At the end you'll see a "Manual follow-ups" block. **Read it.** It tells you to fix:
 
-- `chart/values.yaml`: `server.image.repository` and `web.image.repository` still say `oas-go-template` / `oas-go-template-web` — set them to your registry paths (the script can't infer your registry).
+- `chart/values.yaml`: defaults are already `<new-name>` / `<new-name>-web` (rewritten by the short-name pass — matches the Docker tags produced by `make docker` / `make web-docker`, so local clusters like kind/k3s/minikube work with no edits). Only add a registry prefix by hand if you push to a remote, e.g. `ghcr.io/yourorg/<new-name>`.
 - `README.md` © line and `chart/Chart.yaml` maintainers — author/copyright info, edit by hand.
 - `spec/openapi.yaml` — replace the example `/healthz` `/readyz` `/version` paths with your real API.
 
@@ -154,6 +154,15 @@ docker stop smoke
 
 If `make gen` produced a `git status` diff after this, generation isn't idempotent — investigate before committing.
 
+### Step 6 — Commit the initial state
+
+```bash
+git add .
+git commit -m "init project"
+```
+
+Snapshots the renamed-and-verified baseline before you start writing real handlers in `internal/handler/`. Subsequent spec changes and handler work go in their own commits.
+
 ## What `init-project.sh` Touches (transparency)
 
 If you'd rather do the rename by hand or audit what the script does, here's the full map of where the template's identity lives:
@@ -162,7 +171,7 @@ If you'd rather do the rename by hand or audit what the script does, here's the 
 |-----------|----------|---------------------|
 | Module path | `go.mod:1`, all `*.go` imports, `Makefile` (ldflags), `build/Dockerfile` (ldflags), `.golangci.yml` (`goimports.local-prefixes`), `internal/handler/version.go` (tracer name) | ✓ module pass |
 | Short name | `cmd/server/main.go:serviceName`, `Makefile` (docker tags, helm template), `chart/Chart.yaml`, `chart/templates/_helpers.tpl`, `chart/templates/*.yaml`, `chart/NOTES.txt`, `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `web/README.md`, `SKILL.md` | ✓ short-name pass |
-| Image repository | `chart/values.yaml` (`server.image.repository`, `web.image.repository`) | ✗ manual — registry path isn't derivable |
+| Image repository | `chart/values.yaml` (`server.image.repository` = `<new-name>`, `web.image.repository` = `<new-name>-web`) | ✓ short-name pass (registry prefix by hand only if pushing to a remote) |
 | Author / copyright | `README.md` (© line), `chart/Chart.yaml` (`maintainers`) | ✗ manual — your name, not the project's |
 | Generated code | `internal/api/*.gen.go`, `pkg/api/*.gen.go` | refreshed by `make gen` (skipped by sed) |
 

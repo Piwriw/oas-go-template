@@ -17,8 +17,8 @@
 #      Helm chart name + helpers + README, README/CLAUDE/CONTRIBUTING titles).
 #   4. Skips *.gen.go (regenerated in step 5).
 #   5. Runs `make gen` so the embedded OAS + types pick up the new package.
-#   6. Prints any leftovers you need to handle by hand (chart image repos,
-#      registry paths that aren't derivable from the module name).
+#   6. Prints any leftovers you need to handle by hand (registry prefix to
+#      prepend to chart image repos when you push to a remote registry).
 #
 # After it finishes: review the leftovers, set chart image repositories to your
 # registry paths, edit spec/openapi.yaml to define your API, then commit.
@@ -148,9 +148,10 @@ Done. Renamed:
   name:    $OLD_NAME  ->  $NEW_NAME
 
 Manual follow-ups (the script can't infer these):
-  1. chart/values.yaml:
-       server.image.repository: $OLD_NAME        -> <registry>/$NEW_NAME
-       web.image.repository:    ${OLD_NAME}-web  -> <registry>/${NEW_NAME}-web
+  1. chart/values.yaml: image repos default to "$NEW_NAME" / "${NEW_NAME}-web"
+     (script rewrote them — matches the Docker tags from 'make docker' /
+     'make web-docker'). Prepend your registry prefix only if you push to a
+     remote, e.g.  ghcr.io/yourorg/$NEW_NAME
   2. spec/openapi.yaml: replace the example paths (/healthz, /readyz, /version)
      with your real API, then run 'make gen' again.
   3. Author / copyright: README.md (© line) and chart/Chart.yaml (maintainers)
