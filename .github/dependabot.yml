@@ -6,8 +6,7 @@ updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore(deps)
@@ -16,8 +15,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     commit-message:
       prefix: chore(ci)
       include: scope
@@ -25,8 +23,7 @@ updates:
   - package-ecosystem: docker
     directory: /build
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     commit-message:
       prefix: chore(deps)
       include: scope
@@ -34,8 +31,7 @@ updates:
   - package-ecosystem: docker
     directory: /web
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     commit-message:
       prefix: chore(deps)
       include: scope
