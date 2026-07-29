@@ -24,6 +24,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	healthPath   = "/healthz"
+	readyPath    = "/readyz"
+	metricsPath  = "/metrics"
+	loggerKey    = "slog.logger"
+	requestIDKey = "request_id"
+)
+
 // LogConfig drives slog setup. Loaded by internal/config.
 type LogConfig struct {
 	Format string `mapstructure:"format"`
@@ -45,7 +53,9 @@ func New(cfg LogConfig) *slog.Logger {
 
 // Middleware generates (or accepts) a request_id per request, stores it in the gin
 // context, mirrors it back via X-Request-ID response header, and writes one structured
-// log line per request. The base logger is the project-wide slog.Default().
+// access log for application requests. Kubernetes probes and metrics scrapes are
+// omitted to avoid high-volume operational noise. The base logger is the project-wide
+// slog.Default().
 //
 // Note: slog.Default() is captured once per middleware build so request hot path
 // does one With() rather than two Default() lookups (Default() walks an atomic
@@ -69,13 +79,38 @@ func Middleware() gin.HandlerFunc {
 
 		c.Next()
 
-		logger.InfoContext(c.Request.Context(), "http request",
+		if skipAccessLog(c.Request.URL.Path) {
+			return
+		}
+
+		status := c.Writer.Status()
+		logger.LogAttrs(c.Request.Context(), accessLogLevel(status), "http request",
 			slog.String("method", c.Request.Method),
 			slog.String("path", c.Request.URL.Path),
-			slog.Int("status", c.Writer.Status()),
+			slog.Int("status", status),
 			slog.Int("bytes", c.Writer.Size()),
 			slog.Duration("latency", time.Since(start)),
 		)
+	}
+}
+
+func skipAccessLog(path string) bool {
+	switch path {
+	case healthPath, readyPath, metricsPath:
+		return true
+	default:
+		return false
+	}
+}
+
+func accessLogLevel(status int) slog.Level {
+	switch {
+	case status >= 500:
+		return slog.LevelError
+	case status >= 400:
+		return slog.LevelWarn
+	default:
+		return slog.LevelInfo
 	}
 }
 
@@ -127,11 +162,6 @@ func (h *otelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 func (h *otelHandler) WithGroup(name string) slog.Handler {
 	return &otelHandler{inner: h.inner.WithGroup(name)}
 }
-
-const (
-	loggerKey    = "slog.logger"
-	requestIDKey = "request_id"
-)
 
 func parseLevel(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {

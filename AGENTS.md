@@ -129,7 +129,7 @@ balancers can observe the state change; keep the Helm
 
 ### /metrics
 
-`GET /metrics` is hardcoded in `cmd/server/main.go:newHTTPServer` and serves `promhttp.Handler()` from `prometheus.DefaultGatherer`. Always on, not configurable — it's an ops endpoint, not part of the API contract, and there's no good reason to disable it. Intentionally absent from `spec/openapi.yaml` so the client SDK doesn't carry a useless `GetMetrics*` method. Routed through the full middleware chain (otelgin + logging) — every scrape is traced and logged.
+`GET /metrics` is hardcoded in `cmd/server/main.go:newHTTPServer` and serves `promhttp.Handler()` from `prometheus.DefaultGatherer`. Always on, not configurable — it's an ops endpoint, not part of the API contract, and there's no good reason to disable it. Intentionally absent from `spec/openapi.yaml` so the client SDK doesn't carry a useless `GetMetrics*` method. It is routed through the full middleware chain and traced, but `logging.Middleware` suppresses its access log along with `/healthz` and `/readyz` to avoid Kubernetes scrape and probe noise.
 
 ### Version injection
 
@@ -151,6 +151,7 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **Named constants at the top**: package-scoped fixed values, especially repeated strings and values used in control flow (route paths, context keys, header names, etc.), belong in a named `const` block immediately after the imports. Do not scatter string literals through `switch` cases or conditionals.
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
 - **`os.Exit(0)` after defers**: gocritic's `exitAfterDefer` will fail lint. `main` returns through `run()` and exits via `os.Exit(1)` only on error — keep it that way.
 - **Empty OAS spec breaks the build**: keep at least one path and one schema in `spec/openapi.yaml`, otherwise `cmd/server/main.go` references symbols that no longer exist after `make gen`.

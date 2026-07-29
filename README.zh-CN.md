@@ -161,6 +161,8 @@ make dev-stack-down                                  # 用完关掉
 
 每条日志都带 `trace_id` / `span_id`，因为 `otelgin.Middleware` 跑在 `logging.Middleware` **之前**（见 `cmd/server/main.go`）。把 `trace_id` 直接粘到 Jaeger 的 "Find a trace" 框里，就能从日志跳到对应的 trace。
 
+HTTP 访问日志按响应状态分级：2xx/3xx 使用 `INFO`，4xx 使用 `WARN`，5xx 使用 `ERROR`。为减少 Kubernetes 探针和指标抓取产生的噪声，不记录 `/healthz`、`/readyz` 和 `/metrics` 的访问日志。
+
 `GET /metrics` 从 `prometheus.DefaultRegisterer` 输出 Prometheus 格式（Go runtime + process 指标始终存在；启用 OTel 后还会加上 OTel 翻译过来的应用指标）。这个端点**故意不在** `spec/openapi.yaml` 里——它是运维端点，不属于 API 契约。
 
 如果 `docker compose up` 拉不动镜像，在 Docker daemon 里配 registry mirror，或从国内镜像拉取后重打 tag：

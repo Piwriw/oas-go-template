@@ -194,6 +194,10 @@ runs before `logging.Middleware` (see `cmd/server/main.go`). Paste the
 `trace_id` straight into Jaeger's "Find a trace" box to jump from a log
 entry to the corresponding trace.
 
+HTTP access logs use `INFO` for 2xx/3xx responses, `WARN` for 4xx, and
+`ERROR` for 5xx. `/healthz`, `/readyz`, and `/metrics` access logs are omitted
+to avoid Kubernetes probe and metrics-scrape noise.
+
 `GET /metrics` serves Prometheus format off `prometheus.DefaultRegisterer`
 (Go runtime + process collectors always present; OTel-translated app metrics
 added when OTel is enabled). The endpoint is intentionally not in
