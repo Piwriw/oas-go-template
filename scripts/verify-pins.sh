@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Verify the exact toolchain, explicit Docker image tags, and immutable Action
-# references used by local and CI builds.
+# Verify the exact toolchain and lint version, explicit Docker image tags, and
+# immutable Action references used by local and CI builds.
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -11,6 +11,16 @@ go_version=$(awk '$1 == "go" { print $2; exit }' go.mod)
 actual_go_version=$(go env GOVERSION)
 if [ "$actual_go_version" != "go$go_version" ]; then
 	echo "Go toolchain mismatch: go.mod requires go$go_version, running $actual_go_version" >&2
+	exit 1
+fi
+
+lint_version=$(awk '$1 == "GOLANGCI_LINT_VERSION" { print $3; exit }' Makefile)
+ci_lint_version=$(awk '
+	/uses: golangci\/golangci-lint-action@/ { action = 1; next }
+	action && $1 == "version:" { print $2; exit }
+' .github/workflows/ci.yml)
+if [ "$ci_lint_version" != "v$lint_version" ]; then
+	echo "golangci-lint version mismatch: Makefile has $lint_version, CI has $ci_lint_version" >&2
 	exit 1
 fi
 
@@ -56,4 +66,4 @@ for action_ref in $(sed -n 's/^[[:space:]]*- uses: \([^[:space:]#]*\).*$/\1/p' .
 	esac
 done
 
-echo "Go toolchain is $actual_go_version; Docker tags and GitHub Action SHAs are valid."
+echo "Go toolchain is $actual_go_version; tool versions, Docker tags, and GitHub Action SHAs are valid."

@@ -139,6 +139,16 @@ balancers can observe the state change; keep the Helm
 
 `web/` (Vite + React + TS) deploys separately from the server. `web/Dockerfile` is multi-stage (node → nginx-unprivileged on `:8080`); backend runs on `:8000`. The server does **not** serve `web/dist`. There is no typed client generated into `web/src/api/` — that's intentional (left for the user's stack choice).
 
+### Developer tool management
+
+The `tool` block in `go.mod` pins `oapi-codegen`, `goimports`, and
+`govulncheck`; invoke them through `go tool`, not globally installed binaries.
+`golangci-lint` intentionally stays outside the application module graph:
+local development uses its official release binary and CI uses the official
+Action pinned to a commit SHA. `oasdiff` and `gosec` remain isolated behind
+versioned `go run` commands. `make tools` only installs the pinned `air` binary
+for optional local live reload.
+
 ## Watch-outs
 
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.

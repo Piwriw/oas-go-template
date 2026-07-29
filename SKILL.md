@@ -98,10 +98,11 @@ Then regenerate:
 make gen
 ```
 
-`scripts/gen.sh` pins `oapi-codegen` to v2.7.1 so committed generated files
-remain deterministic in CI. Upgrade deliberately with
-`OAPI_CODEGEN_VERSION=vX.Y.Z make gen`, review the full generated diff, and
-commit the generator change together with the regenerated outputs.
+The `tool` block in `go.mod` pins `oapi-codegen` to v2.7.1 so committed
+generated files remain deterministic in CI. Upgrade deliberately with
+`go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@vX.Y.Z`,
+run `make gen`, review the full generated diff, and commit the module and
+generated changes together.
 
 `scripts/gen.sh` calls `oapi-codegen` **five** times:
 
@@ -144,8 +145,8 @@ If you forget a method, this line fails the build with a clear error listing eve
 ```bash
 make build       # binaries land in bin/
 make test        # go test -race -cover ./...
-make lint        # golangci-lint v2, excludes *.gen.go
-make audit       # govulncheck + gosec (CI gate)
+make lint        # official golangci-lint v2 binary, excludes *.gen.go
+make audit       # go tool govulncheck + isolated gosec (CI gate)
 make docker GOPROXY=https://goproxy.cn,direct   # remove GOPROXY if not behind GFW
 docker run --rm -d -p 18000:8000 --name smoke my-new-project:latest
 curl -sf http://localhost:18000/<your-first-endpoint>
@@ -186,9 +187,10 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 | `make run` | `go run` server (with ldflags) |
 | `make run-client` | `go run` client |
 | `make test` | `go test -race -cover ./...` |
-| `make lint` | `golangci-lint run` (v2) |
-| `make fmt` | `goimports` with `-local <module>` to enforce import grouping |
-| `make audit` | `govulncheck` + `gosec` (CI gate; non-zero on any finding) |
+| `make lint` | Official `golangci-lint` binary, `golangci-lint run` (v2) |
+| `make lint-config` | Verify the golangci-lint v2 configuration |
+| `make fmt` | `go tool goimports` with `-local <module>` to enforce import grouping |
+| `make audit` | `go tool govulncheck` + isolated `go run ...gosec@version` (CI gate; non-zero on any finding) |
 | `make docker` | Build server image (pass `GOPROXY=...` if behind GFW; passes `VERSION/GIT_COMMIT/BUILD_TIME` via build-arg) |
 | `make web-docker` | Build frontend image (multi-stage node → nginx-unprivileged on :8080) |
 | `make helm-lint` / `make helm-template` | Validate / render the Helm chart |

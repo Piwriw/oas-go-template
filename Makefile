@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen tools contract-check supply-chain-check build run run-client test lint fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen tools contract-check supply-chain-check build run run-client test lint lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -11,10 +11,9 @@ LDFLAGS     := -X $(VERSION_PKG).Version=$(VERSION) \
                -X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) \
                -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
 
-# Pin developer and security tools so local checks and CI stay reproducible.
-OAPI_CODEGEN_VERSION ?= v2.7.1
-GOLANGCI_LINT_VERSION ?= v2.12.2
-GOVULNCHECK_VERSION ?= v1.6.0
+# Go-managed tool versions live in go.mod. Keep tools that intentionally run
+# outside the application module graph pinned here.
+GOLANGCI_LINT_VERSION ?= 2.12.2
 GOSEC_VERSION ?= v2.27.1
 AIR_VERSION ?= v1.66.0
 OASDIFF_VERSION ?= v1.10.28
@@ -27,17 +26,15 @@ help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 gen:  ## Generate code from spec/openapi.yaml
-	OAPI_CODEGEN_VERSION=$(OAPI_CODEGEN_VERSION) ./scripts/gen.sh
+	./scripts/gen.sh
 
 contract-check:  ## Reject breaking OpenAPI changes against BASE_SPEC
 	go run github.com/tufin/oasdiff@$(OASDIFF_VERSION) breaking "$(BASE_SPEC)" spec/openapi.yaml --fail-on ERR
 
-supply-chain-check:  ## Verify exact Go, Docker image, and GitHub Action pins
+supply-chain-check:  ## Verify Go, tool, Docker image, and GitHub Action pins
 	./scripts/verify-pins.sh
 
-tools:  ## Install pinned developer tools
-	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION)
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+tools:  ## Install pinned local-only tools (Go tools run directly from go.mod)
 	go install github.com/air-verse/air@$(AIR_VERSION)
 
 build:  ## Build server and client binaries into ./bin (with version ldflags)
@@ -54,14 +51,21 @@ run-client:  ## Run client locally (assumes server is up)
 test:  ## Run all tests
 	go test -race -cover ./...
 
-lint:  ## Run golangci-lint
+lint: lint-version-check  ## Run golangci-lint
 	golangci-lint run ./...
 
+lint-config: lint-version-check  ## Verify the golangci-lint v2 configuration
+	golangci-lint config verify
+
+lint-version-check:
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not found; install an official binary: https://golangci-lint.run/docs/welcome/install/local/" >&2; exit 1; }
+	@actual=$$(golangci-lint version --short); test "$$actual" = "$(GOLANGCI_LINT_VERSION)" || { echo "golangci-lint $$actual found; want $(GOLANGCI_LINT_VERSION)" >&2; exit 1; }
+
 fmt:  ## Format Go code with goimports (gofmt + import grouping)
-	goimports -local github.com/piwriw/oas-go-template -w .
+	go tool goimports -local github.com/piwriw/oas-go-template -w .
 
 audit:  ## Scan dependencies (govulncheck) and source (gosec) for security issues
-	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+	go tool govulncheck ./...
 	go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
 
 docker:  ## Build server docker image (override GOPROXY via env if behind restricted network)

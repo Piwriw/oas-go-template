@@ -10,9 +10,11 @@ Requirements:
 
 - Go 1.26+
 - [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) v2.7.1 —
-  installed by `scripts/gen.sh`, no separate install needed
+  managed by `go.mod` and downloaded automatically by `go tool`
+- An [official `golangci-lint` v2.12.2 binary](https://golangci-lint.run/docs/welcome/install/local/)
+  for local linting; CI uses the same version through the official action
 - `make`, `docker`, `helm` (only for chart changes), Node 22+ (only for `web/`)
-- Pinned developer tools — install with `make tools`
+- Optional live reload with pinned `air` — install with `make tools`
 
 ```bash
 git clone <this repo>
@@ -25,11 +27,14 @@ make gen build test
 
 ```bash
 make gen        # regenerate *.gen.go after editing spec/openapi.yaml
-make tools      # install pinned oapi-codegen, golangci-lint, and air
-# OAPI_CODEGEN_VERSION=vX.Y.Z make gen  # coordinated generator upgrade only
-make lint test  # always green before pushing
+make tools      # optionally install pinned air for live reload
+make lint-config lint test  # always green before pushing
 make audit      # govulncheck v1.6.0 + gosec v2.27.1
 ```
+
+Upgrade the generator deliberately with
+`go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@vX.Y.Z`,
+then regenerate and review all generated output in the same change.
 
 ## Code generation rules
 

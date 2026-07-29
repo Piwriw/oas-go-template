@@ -58,7 +58,6 @@ jobs:
     name: Lint, test, audit
     runs-on: ubuntu-latest
     env:
-      GOLANGCI_LINT_VERSION: v2.12.2
       HELM_VERSION: v3.16.2
       OASDIFF_VERSION: v1.10.28
       GOTOOLCHAIN: local
@@ -75,18 +74,10 @@ jobs:
       - name: Verify immutable supply-chain pins
         run: make supply-chain-check
 
-      - name: Install golangci-lint
-        run: |
-          make tools
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
       - name: Install helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: ${{ env.HELM_VERSION }}
-
-      - name: Verify golangci-lint config (v2 schema)
-        run: golangci-lint config verify
 
       - name: Codegen sync (make gen produces no diff)
         run: |
@@ -112,7 +103,9 @@ jobs:
           fi
 
       - name: Lint (golangci-lint v2)
-        run: make lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.12.2
 
       - name: Test (race + cover)
         run: make test

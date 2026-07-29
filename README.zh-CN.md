@@ -66,7 +66,7 @@
    b. README.md 的 © 行、chart/Chart.yaml 的 maintainers —— 问我作者署名，
       替换掉 piwriw。
 7. 按顺序验证：
-   - golangci-lint config verify    # 应无任何输出
+   - make lint-config               # 应无任何输出
    - make gen                       # 应无 diff
    - make build test lint           # 全部绿
 8. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
@@ -85,7 +85,7 @@ author 的值再继续。
 
 ```bash
 make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go（固定 oapi-codegen v2.7.1）
-make tools     # 安装固定版本的开发工具
+make tools     # 安装可选的本地热重载工具 air
 make build     # 编译 cmd/server 和 cmd/client 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server
 make test      # go test -race -cover ./...
@@ -93,6 +93,12 @@ make lint      # golangci-lint v2（排除 *.gen.go，禁止 legacy log 包）
 make audit     # govulncheck v1.6.0 + gosec v2.27.1（CI 门禁）
 make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 ```
+
+`oapi-codegen`、`goimports` 和 `govulncheck` 由 `go.mod` 的 `tool` 块固定版本，
+并通过 `go tool` 运行；首次使用时 Go 会自动下载。执行本地 lint 前需要安装
+[golangci-lint v2.12.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
+CI 则使用固定到不可变提交的官方 Action。`make tools` 只安装本地开发辅助工具
+`air` 的固定版本。
 
 ## 配置
 

@@ -77,7 +77,7 @@ Procedure:
    b. README.md © line and chart/Chart.yaml maintainers — ask me for
       author info and update.
 7. Verify the result, in this order:
-   - golangci-lint config verify    # must pass with no output
+   - make lint-config               # must pass with no output
    - make gen                       # should produce no diff
    - make build test lint           # all green
 8. Report a one-paragraph summary: what changed, what's left for me to do
@@ -98,7 +98,7 @@ For a project you've already initialized (or to explore the template itself):
 
 ```bash
 make gen       # regenerate *.gen.go (pinned oapi-codegen v2.7.1)
-make tools     # install pinned developer tools
+make tools     # install air for optional local live reload
 make build     # build cmd/server and cmd/client into bin/
 make run       # go run cmd/server with version ldflags
 make test      # go test -race -cover ./...
@@ -106,6 +106,12 @@ make lint      # golangci-lint v2 (excludes *.gen.go, forbids legacy log)
 make audit     # govulncheck v1.6.0 + gosec v2.27.1 (CI gate)
 make docker    # build server image (pass GOPROXY=... if behind GFW)
 ```
+
+`oapi-codegen`, `goimports`, and `govulncheck` are pinned by the `tool` block
+in `go.mod` and run through `go tool`; Go downloads them on first use. Local
+linting expects the [official golangci-lint v2.12.2 binary](https://golangci-lint.run/docs/welcome/install/local/),
+while CI uses the official action pinned to an immutable commit. `make tools`
+only installs the pinned `air` binary because it is a local development aid.
 
 ## Configuration
 
