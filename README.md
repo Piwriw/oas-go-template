@@ -195,8 +195,9 @@ runs before `logging.Middleware` (see `cmd/server/main.go`). Paste the
 entry to the corresponding trace.
 
 HTTP access logs use `INFO` for 2xx/3xx responses, `WARN` for 4xx, and
-`ERROR` for 5xx. `/healthz`, `/readyz`, and `/metrics` access logs are omitted
-to avoid Kubernetes probe and metrics-scrape noise.
+`ERROR` for 5xx. `/healthz`, `/readyz`, and `/metrics` log their first
+successful request and all errors; repeated successes are omitted to avoid
+Kubernetes probe and metrics-scrape noise.
 
 `GET /metrics` serves Prometheus format off `prometheus.DefaultRegisterer`
 (Go runtime + process collectors always present; OTel-translated app metrics

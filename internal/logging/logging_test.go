@@ -50,25 +50,45 @@ func TestMiddlewareAccessLogLevels(t *testing.T) {
 	}
 }
 
-func TestMiddlewareSkipsOperationalAccessLogs(t *testing.T) {
+func TestMiddlewareLogsOperationalAccessOnceAndOnError(t *testing.T) {
 	for _, path := range []string{"/healthz", "/readyz", "/metrics"} {
 		t.Run(path, func(t *testing.T) {
 			var output bytes.Buffer
 			setDefaultLogger(t, slog.New(slog.NewJSONHandler(&output, nil)))
 
+			status := http.StatusOK
 			r := newTestRouter()
 			r.GET(path, func(c *gin.Context) {
-				c.Status(http.StatusOK)
+				c.Status(status)
 			})
 
-			recorder := httptest.NewRecorder()
-			r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
-
-			if output.Len() != 0 {
-				t.Errorf("unexpected access log: %s", output.String())
+			request := func() *httptest.ResponseRecorder {
+				recorder := httptest.NewRecorder()
+				r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+				return recorder
 			}
-			if recorder.Header().Get("X-Request-ID") == "" {
+
+			if recorder := request(); recorder.Header().Get("X-Request-ID") == "" {
 				t.Error("X-Request-ID header is missing")
+			}
+			if output.Len() == 0 {
+				t.Fatal("first request was not logged")
+			}
+
+			output.Reset()
+			request()
+			if output.Len() != 0 {
+				t.Errorf("repeated successful request was logged: %s", output.String())
+			}
+
+			status = http.StatusServiceUnavailable
+			request()
+			var record map[string]any
+			if err := json.Unmarshal(output.Bytes(), &record); err != nil {
+				t.Fatalf("decode error access log %q: %v", output.String(), err)
+			}
+			if got := int(record["status"].(float64)); got != status {
+				t.Errorf("status=%d, want %d", got, status)
 			}
 		})
 	}

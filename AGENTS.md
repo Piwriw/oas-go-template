@@ -129,7 +129,7 @@ balancers can observe the state change; keep the Helm
 
 ### /metrics
 
-`GET /metrics` is hardcoded in `cmd/server/main.go:newHTTPServer` and serves `promhttp.Handler()` from `prometheus.DefaultGatherer`. Always on, not configurable — it's an ops endpoint, not part of the API contract, and there's no good reason to disable it. Intentionally absent from `spec/openapi.yaml` so the client SDK doesn't carry a useless `GetMetrics*` method. It is routed through the full middleware chain and traced, but `logging.Middleware` suppresses its access log along with `/healthz` and `/readyz` to avoid Kubernetes scrape and probe noise.
+`GET /metrics` is hardcoded in `cmd/server/main.go:newHTTPServer` and serves `promhttp.Handler()` from `prometheus.DefaultGatherer`. Always on, not configurable — it's an ops endpoint, not part of the API contract, and there's no good reason to disable it. Intentionally absent from `spec/openapi.yaml` so the client SDK doesn't carry a useless `GetMetrics*` method. It is routed through the full middleware chain and traced. For `/metrics`, `/healthz`, and `/readyz`, `logging.Middleware` records the first successful request and every error, then suppresses repeated successes to avoid scrape and probe noise.
 
 ### Version injection
 

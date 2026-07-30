@@ -212,12 +212,8 @@ func TestCORSRejectsDisallowedOrigin(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	var body internalapi.Error
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode forbidden response: %v; body=%s", err, rec.Body.String())
-	}
-	if body.Code != int32(errcode.Forbidden) || body.Message != "forbidden" {
-		t.Errorf("body=%+v", body)
+	if rec.Body.Len() != 0 {
+		t.Errorf("body=%q, want empty", rec.Body.String())
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Errorf("disallowed origin got CORS header=%q", got)

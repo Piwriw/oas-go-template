@@ -16,8 +16,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -53,15 +55,16 @@ func New(cfg LogConfig) *slog.Logger {
 
 // Middleware generates (or accepts) a request_id per request, stores it in the gin
 // context, mirrors it back via X-Request-ID response header, and writes one structured
-// access log for application requests. Kubernetes probes and metrics scrapes are
-// omitted to avoid high-volume operational noise. The base logger is the project-wide
-// slog.Default().
+// access log for application requests. Operational endpoints log their first
+// successful request and all errors; repeated successes are omitted. The base
+// logger is the project-wide slog.Default().
 //
 // Note: slog.Default() is captured once per middleware build so request hot path
 // does one With() rather than two Default() lookups (Default() walks an atomic
 // each call).
 func Middleware() gin.HandlerFunc {
 	base := slog.Default()
+	var loggedOperationalPaths sync.Map
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -79,11 +82,11 @@ func Middleware() gin.HandlerFunc {
 
 		c.Next()
 
-		if skipAccessLog(c.Request.URL.Path) {
+		status := c.Writer.Status()
+		if skipAccessLog(c.Request.URL.Path, status, &loggedOperationalPaths) {
 			return
 		}
 
-		status := c.Writer.Status()
 		logger.LogAttrs(c.Request.Context(), accessLogLevel(status), "http request",
 			slog.String("method", c.Request.Method),
 			slog.String("path", c.Request.URL.Path),
@@ -94,10 +97,14 @@ func Middleware() gin.HandlerFunc {
 	}
 }
 
-func skipAccessLog(path string) bool {
+func skipAccessLog(path string, status int, logged *sync.Map) bool {
+	if status >= http.StatusBadRequest {
+		return false
+	}
 	switch path {
 	case healthPath, readyPath, metricsPath:
-		return true
+		_, alreadyLogged := logged.LoadOrStore(path, struct{}{})
+		return alreadyLogged
 	default:
 		return false
 	}

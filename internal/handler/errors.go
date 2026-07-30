@@ -19,8 +19,7 @@ import (
 func StrictServerOptions() api.StrictGinServerOptions {
 	return api.StrictGinServerOptions{
 		RequestErrorHandlerFunc: func(c *gin.Context, err error) {
-			var maxBytesErr *http.MaxBytesError
-			if errors.As(err, &maxBytesErr) {
+			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 				writeError(c, http.StatusRequestEntityTooLarge, errcode.RequestBodyTooLarge, "request body too large", err)
 				return
 			}
