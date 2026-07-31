@@ -58,6 +58,7 @@ Inputs (ask me for any that are missing before you start):
 - TARGET_PATH   : where the new project should live
 - MODULE_PATH   : e.g. github.com/yourorg/my-project
 - SHORT_NAME    : optional; defaults to the last segment of MODULE_PATH
+- DATABASE_DRIVER: required; exactly one of postgres / mysql / sqlite
 - GITHUB_HOSTED : yes / no — will this project live on GitHub.com?
                   no  → delete .github/ (CI workflow, Dependabot, issue
                          templates, security-advisory URL all assume GitHub).
@@ -71,20 +72,29 @@ Procedure:
    (Otherwise leave it. The renamer has already rewritten every
    github.com/piwriw/oas-go-template URL inside .github/ to point at the
    new module path, so CI / Dependabot / issue templates keep working.)
-6. The script will print a "Manual follow-ups" block. Handle each:
+6. Specialize the project for DATABASE_DRIVER using SKILL.md Step 3:
+   a. Keep only that Gorm dialector and golang-migrate database adapter in
+      production code; remove branches, aliases, and config validation for the
+      other two databases.
+   b. Rewrite DB/migration tests for the selected database; do not retain
+      SQLite as an undeclared test shortcut for a PostgreSQL/MySQL project.
+   c. Run go mod tidy and verify project source plus direct go.mod requirements
+      contain no unselected driver or migration adapter. Third-party tracing
+      plugins may still pull database packages into the transitive graph.
+7. The script will print a "Manual follow-ups" block. Handle each:
    a. chart/values.yaml — ask me for the image registry/repo and update
       server.image.repository and web.image.repository accordingly.
    b. README.md © line and chart/Chart.yaml maintainers — ask me for
       author info and update.
-7. Verify the result, in this order:
+8. Verify the result, in this order:
    - make lint-config               # must pass with no output
    - make gen                       # should produce no diff
    - make build test lint           # all green
-8. Report a one-paragraph summary: what changed, what's left for me to do
+9. Report a one-paragraph summary: what changed, what's left for me to do
    (e.g. "edit spec/openapi.yaml to define your API, then make gen again").
 
 Read SKILL.md for the full map of what the renamer touches, what it skips,
-and the configuration traps to watch for. Do not proceed past step 6
+and the configuration traps to watch for. Do not proceed past step 7
 without my confirmation on the registry and author values.
 ````
 

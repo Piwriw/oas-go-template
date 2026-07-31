@@ -1,6 +1,6 @@
 ---
 name: use-oas-go-template
-description: Use when starting a new Go project from the oas-go-template boilerplate — covers running the init-project.sh rename script, regenerating code from OAS spec, swapping in your own API, and avoiding the configuration traps that bite during setup.
+description: Use when starting a new Go project from the oas-go-template boilerplate — covers collecting required project and database choices, running the init-project.sh rename script, pruning unused database drivers, regenerating code from OAS spec, swapping in the real API, and avoiding setup traps.
 ---
 
 # Use oas-go-template
@@ -9,7 +9,7 @@ description: Use when starting a new Go project from the oas-go-template boilerp
 
 `oas-go-template` is a Go project template built around OpenAPI Specification 3.x as the single source of truth. It generates gin server stubs and a client SDK from `spec/openapi.yaml` via `oapi-codegen`, ships with config/middleware/otel/version/errcode modules, a Dockerfile, Makefile, golangci-lint config, a Helm chart, and a Vite + React + TS frontend.
 
-This skill tells you how to take the template and turn it into your own project: run the rename script, swap in your API, regenerate code, and avoid the traps that bit during the original build.
+This skill tells you how to take the template and turn it into your own project: collect the required choices, run the rename script, retain one database driver, swap in your API, regenerate code, and avoid the traps that bit during the original build.
 
 ## When to Use
 
@@ -38,7 +38,7 @@ Don't use this skill for:
 | `internal/api/*.gen.go` | **Generated**. Server types + gin bindings + `StrictServerInterface` + embedded OAS document. | Never hand-edit |
 | `internal/handler/` | Your business logic. Implements `StrictServerInterface`. | **Yes — real logic here** |
 | `internal/config/` | Loads `config.yaml` and validates. | Add fields as needed |
-| `internal/db/` | Gorm init with OTel plugin + connection pool. Disabled when `db.driver` empty. | Yes — register models / add migrations once you adopt it |
+| `internal/db/` | Gorm init, embedded SQL migrations, and three template-time database drivers. | **Yes — retain exactly one driver during initialization** |
 | `internal/logging/` | slog setup with trace_id/span_id/request_id injection. | No |
 | `internal/otel/` | OTel SDK init (OTLP HTTP traces+metrics, Prometheus pull reader). | No |
 | `internal/errcode/` | Typed int32 error codes returned in `api.Error.Code`. | Yes — add codes for your domains |
@@ -53,6 +53,21 @@ Don't use this skill for:
 | `.golangci.yml` | Lint config; v2 syntax; excludes `*.gen.go`; forbids legacy `log` package via `forbidigo`. | No |
 
 ## The 60-Second Path to "It's Mine"
+
+### Required inputs — collect before changing files
+
+Collect all of these values before copying or modifying the template:
+
+- `TARGET_PATH` — where the new project will live
+- `MODULE_PATH` — for example `github.com/yourorg/my-project`
+- `SHORT_NAME` — optional; default to the last `MODULE_PATH` segment
+- `DATABASE_DRIVER` — exactly one of `postgres`, `mysql`, or `sqlite`
+- `GITHUB_HOSTED` — whether the project will live on GitHub.com
+
+If `DATABASE_DRIVER` is missing, ask the customer and wait for the answer. Do
+not infer it from a local DSN, default to PostgreSQL, or leave all three drivers
+in the derived project. The choice specializes the compiled project; an empty
+runtime `db.driver` may still disable the selected database dependency.
 
 ### Step 1 — Copy the template
 
@@ -88,7 +103,60 @@ At the end you'll see a "Manual follow-ups" block. **Read it.** It tells you to 
 - `README.md` © line and `chart/Chart.yaml` maintainers — author/copyright info, edit by hand.
 - `spec/openapi.yaml` — replace the example `/healthz` `/readyz` `/version` paths with your real API.
 
-### Step 3 — Replace the spec with your real API
+### Step 3 — Keep one database driver
+
+Immediately after the rename, specialize the project for `DATABASE_DRIVER`.
+Preserve the optional-database behavior, SQL migration embedding, OTel tracing,
+pool settings, and `schema_migrations`; remove only unselected dialect support.
+
+1. In `internal/db/db.go`, retain the selected Gorm driver import and dialector.
+   Remove the other driver imports, switch branches, aliases, and error text.
+2. In `internal/db/migration.go`, retain only the matching `golang-migrate`
+   database adapter and SQL driver setup. Simplify the driver switch and remove
+   helpers that only serve another dialect. Keep MySQL multi-statements only for
+   MySQL and the non-closing shared connection wrapper only for SQLite.
+3. In `internal/config/config.go` and its tests, accept the empty value plus the
+   selected canonical driver name. Remove aliases and cases for other drivers.
+4. Update `config.example.yaml`, `README.md`, `README.zh-CN.md`, `AGENTS.md`,
+   `CLAUDE.md`, and this skill so the derived project documents only the
+   selected database.
+5. Update DB and migration tests. Do not keep SQLite production or test code in
+   a PostgreSQL/MySQL project merely because it is convenient. Run those tests
+   against a disposable instance of the selected database; if the test
+   environment is not available, stop and ask how the customer wants it
+   provisioned instead of deleting coverage.
+6. Run `go mod tidy`. Confirm project-owned Go files do not import unselected
+   drivers or migration adapters and `go.mod` does not list them as direct
+   requirements. Upstream plugins may import database packages internally, so
+   they can remain in the transitive build graph or as indirect requirements.
+   `go.sum` may likewise retain transitive checksums; do not edit it by hand.
+
+Keep only this driver-specific direct import set in project-owned code:
+
+| `DATABASE_DRIVER` | Keep |
+|---|---|
+| `postgres` | `gorm.io/driver/postgres`, `migrate/v4/database/pgx/v5`, pgx dependencies |
+| `mysql` | `gorm.io/driver/mysql`, `migrate/v4/database/mysql`, `github.com/go-sql-driver/mysql` |
+| `sqlite` | `gorm.io/driver/sqlite`, `migrate/v4/database/sqlite3`, `github.com/mattn/go-sqlite3` |
+
+Verify the cleanup before continuing:
+
+```bash
+make fmt
+go mod tidy
+rg -n 'gorm.io/driver|golang-migrate/migrate/v4/database|go-sql-driver|go-sqlite3|jackc/pgx' \
+  --glob '*.go' --glob '!*.gen.go' .
+go mod edit -json
+go list -deps -test ./... | rg 'gorm.io/driver|golang-migrate/migrate/v4/database|go-sql-driver|go-sqlite3|jackc/pgx'
+make test
+```
+
+The project-source matches and direct `Require` entries must belong to the
+selected database. Use the `go list` output only to trace remaining transitive
+packages to their third-party owner; for example, Gorm's OTel plugin currently
+imports PostgreSQL and ClickHouse drivers internally even in a MySQL project.
+
+### Step 4 — Replace the spec with your real API
 
 Edit `spec/openapi.yaml`. Throw away the `Health` / `VersionInfo` / `Error` examples if you don't need them, but **keep at least one path and one schema** so the generator has something to render. Empty specs produce empty `*.gen.go` files, which then break compilation when `cmd/server/main.go` references symbols that no longer exist.
 
@@ -114,7 +182,7 @@ generated changes together.
 | `pkg/api/client.gen.go` | `api` | client SDK |
 | `pkg/api/spec.gen.go` | `api` | embedded OAS document — `GetSpec()` / `GetSpecJSON()` for runtime introspection (e.g. serving `/openapi.json`, contract testing) |
 
-### Step 4 — Implement `StrictServerInterface`
+### Step 5 — Implement `StrictServerInterface`
 
 Look at the new interface:
 
@@ -140,7 +208,7 @@ var _ api.StrictServerInterface = (*Handler)(nil)
 
 If you forget a method, this line fails the build with a clear error listing every missing method.
 
-### Step 5 — Verify the full pipeline
+### Step 6 — Verify the full pipeline
 
 ```bash
 make build       # binaries land in bin/
@@ -155,7 +223,7 @@ docker stop smoke
 
 If `make gen` produced a `git status` diff after this, generation isn't idempotent — investigate before committing.
 
-### Step 6 — Commit the initial state
+### Step 7 — Commit the initial state
 
 ```bash
 git add .
@@ -228,14 +296,17 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 
 To disable OTel entirely (e.g. in unit tests or local dev), set `otel.enabled: false` in `config.yaml` — `otel.Init` returns `(nil, nil)` and the server runs without exporting. `/metrics` still serves Go runtime + process collectors regardless.
 
-## Database (Gorm) — opt-in
+## Database (Gorm) — choose one, runtime opt-in
 
-`internal/db` ships a Gorm setup with the OTel tracing plugin pre-registered. **Disabled by default** — leave `db.driver` empty in `config.yaml` and the server boots DB-free. Set it + `db.dsn` and `cmd/server/main.go` connects at boot, closes on shutdown.
+The source template ships PostgreSQL, MySQL, and SQLite support only so it can
+serve different projects. A derived project must retain exactly the customer's
+selected driver using Step 3. Runtime use remains opt-in: leave `db.driver`
+empty to boot DB-free, or set the selected driver plus `db.dsn` to connect.
 
 ```yaml
 # config.yaml
 db:
-  driver: postgres                              # postgres | mysql | sqlite
+  driver: postgres                              # the one selected driver
   dsn: "host=localhost user=app password=app dbname=app sslmode=disable"
   max_open_conns: 25
   max_idle_conns: 5
@@ -243,7 +314,7 @@ db:
   log_sql: false                                # flip to true to log every SQL statement
 ```
 
-`*gorm.DB` is already wired into `handler.New(gdb)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503.
+`*gorm.DB` is already wired into `handler.New(gdb)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`.
 
 ## Error codes — `internal/errcode`
 
@@ -381,7 +452,7 @@ If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a Dock
 
 ### 13. SQLite `:memory:` is per-connection
 
-Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` **and** set `DB_MAX_OPEN_CONNS=1`. The `internal/db/db_test.go` test does exactly this.
+Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The `internal/db/db_test.go` test does exactly this.
 
 ### 14. Pass `*gorm.DB` via the handler constructor
 

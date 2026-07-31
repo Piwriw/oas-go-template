@@ -48,6 +48,7 @@
 - TARGET_PATH   : 新项目要放的位置
 - MODULE_PATH   : 例如 github.com/yourorg/my-project
 - SHORT_NAME    : 可选；默认取 MODULE_PATH 的最后一段
+- DATABASE_DRIVER: 必填；只能选择 postgres / mysql / sqlite 中的一种
 - GITHUB_HOSTED : yes / no —— 新项目是否托管在 GitHub.com？
                   no  → 删除 .github/（CI workflow、Dependabot、issue 模板、
                          security advisory URL 全都依赖 GitHub）。
@@ -60,20 +61,27 @@
 5. 如果 GITHUB_HOSTED != yes：rm -rf .github/
    （否则保留。重命名脚本已经把 .github/ 里所有 github.com/piwriw/oas-go-template
     的 URL 改写成新的模块路径，CI / Dependabot / issue 模板都能继续工作。）
-6. 脚本会输出一段 "Manual follow-ups"。逐条处理：
+6. 按 SKILL.md 第 3 步根据 DATABASE_DRIVER 专用化项目：
+   a. 生产代码只保留所选 Gorm dialector 和 golang-migrate adapter；删除另外
+      两种数据库的分支、别名和配置校验。
+   b. 把 DB/migration 测试改成所选数据库；PostgreSQL/MySQL 项目不得为了方便
+      而暗中保留 SQLite 测试实现。
+   c. 执行 go mod tidy，并确认项目源码和 go.mod 直接依赖不含未选择的数据库驱动
+      或 migration adapter。第三方 tracing 插件仍可能传递引入数据库包。
+7. 脚本会输出一段 "Manual follow-ups"。逐条处理：
    a. chart/values.yaml —— 问我镜像仓库地址，更新 server.image.repository
       和 web.image.repository。
    b. README.md 的 © 行、chart/Chart.yaml 的 maintainers —— 问我作者署名，
       替换掉 piwriw。
-7. 按顺序验证：
+8. 按顺序验证：
    - make lint-config               # 应无任何输出
    - make gen                       # 应无 diff
    - make build test lint           # 全部绿
-8. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
+9. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
    定义你的 API，再跑一次 make gen"）。
 
 执行前请阅读 SKILL.md，了解重命名脚本改了哪些位置、跳过了哪些、以及所有
-要避开的配置陷阱。第 6 步之后、第 7 步之前，必须等我确认 registry 和
+要避开的配置陷阱。第 7 步之后、第 8 步之前，必须等我确认 registry 和
 author 的值再继续。
 ````
 
