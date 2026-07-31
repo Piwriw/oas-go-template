@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/getkin/kin-openapi v0.140.0
-	github.com/gin-contrib/cors v1.7.6
+	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
