@@ -17,9 +17,7 @@ type Client struct {
 	log       *slog.Logger
 }
 
-// New returns a Client configured by opts. The transport chain
-// (retry → trace → log → base) is wired here once; callers cannot
-// bypass it accidentally.
+// New builds an HTTP client with configured retry, tracing, logging, and base transport behavior.
 func New(opts ...Option) *Client {
 	c := &Client{
 		base:      &http.Client{},

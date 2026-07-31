@@ -28,9 +28,7 @@ var (
 	versionPathPattern = regexp.MustCompile(`^/v[0-9]+(?:/|$)`)
 )
 
-// Validate checks the repository's API versioning and deprecation conventions.
-// The document remains the source of truth, so this check is intentionally
-// independent of generated server or client code.
+// Validate enforces repository API versioning and deprecation policy on the source contract.
 func Validate(doc *openapi3.T) error {
 	if doc == nil {
 		return fmt.Errorf("OpenAPI document is nil")
@@ -72,13 +70,12 @@ func Validate(doc *openapi3.T) error {
 	return validateDeprecations(doc)
 }
 
-// ValidateDeprecations checks only operation deprecation metadata. It is
-// exported separately for tools that load a document without using the URL
-// versioning policy.
+// ValidateDeprecations verifies lifecycle metadata for every deprecated API operation.
 func ValidateDeprecations(doc *openapi3.T) error {
 	return validateDeprecations(doc)
 }
 
+// validateDeprecations checks required dates and ordering for deprecated operations.
 func validateDeprecations(doc *openapi3.T) error {
 	if doc == nil || doc.Paths == nil {
 		return nil
@@ -118,6 +115,7 @@ func validateDeprecations(doc *openapi3.T) error {
 	return nil
 }
 
+// stringExtension reads a trimmed nonempty string from an OpenAPI extension map.
 func stringExtension(extensions map[string]any, name string) (string, bool) {
 	value, ok := extensions[name]
 	if !ok {
@@ -127,6 +125,7 @@ func stringExtension(extensions map[string]any, name string) (string, bool) {
 	return strings.TrimSpace(stringValue), ok && strings.TrimSpace(stringValue) != ""
 }
 
+// mapExtension reads an object-valued OpenAPI extension across supported map representations.
 func mapExtension(extensions map[string]any, name string) (map[string]any, bool) {
 	value, ok := extensions[name]
 	if !ok {
@@ -136,6 +135,7 @@ func mapExtension(extensions map[string]any, name string) (map[string]any, bool)
 	return object, ok
 }
 
+// stringSliceExtension decodes a required list of strings from an OpenAPI extension.
 func stringSliceExtension(extensions map[string]any, name string) ([]string, error) {
 	value, ok := extensions[name]
 	if !ok {
@@ -159,6 +159,7 @@ func stringSliceExtension(extensions map[string]any, name string) ([]string, err
 	}
 }
 
+// timeExtension parses an RFC3339 lifecycle timestamp from an OpenAPI extension.
 func timeExtension(extensions map[string]any, name string) (time.Time, error) {
 	value, ok := stringExtension(extensions, name)
 	if !ok {
@@ -183,9 +184,7 @@ func FindOperation(doc *openapi3.T, ginPath, method string) *openapi3.Operation 
 	return item.Operations()[strings.ToUpper(method)]
 }
 
-// ApplyDeprecationHeaders adds the dates declared on a deprecated operation.
-// The values intentionally remain RFC3339 so clients can compare them with
-// the OAS metadata without lossy HTTP-date conversion.
+// ApplyDeprecationHeaders exposes contract lifecycle dates for a deprecated matched operation.
 func ApplyDeprecationHeaders(c interface{ Header(string, string) }, op *openapi3.Operation) {
 	if op == nil || !op.Deprecated {
 		return
@@ -198,6 +197,7 @@ func ApplyDeprecationHeaders(c interface{ Header(string, string) }, op *openapi3
 	}
 }
 
+// ginPathToOASPath converts Gin colon parameters to OpenAPI brace parameters for route lookup.
 func ginPathToOASPath(path string) string {
 	parts := strings.Split(path, "/")
 	for i, part := range parts {
@@ -208,8 +208,7 @@ func ginPathToOASPath(path string) string {
 	return strings.Join(parts, "/")
 }
 
-// DeprecatedHeaderNames documents the response headers emitted for deprecated
-// operations and is useful when configuring CORS exposed headers.
+// DeprecatedHeaderNames returns the lifecycle response headers clients may need exposed through CORS.
 func DeprecatedHeaderNames() []string {
 	return []string{http.CanonicalHeaderKey(deprecationHeader), http.CanonicalHeaderKey(sunsetHeader)}
 }

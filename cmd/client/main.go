@@ -12,6 +12,7 @@ import (
 	"github.com/piwriw/oas-go-template/pkg/api"
 )
 
+// main runs the example API client and reports fatal request failures.
 func main() {
 	if err := run(); err != nil {
 		slog.Error("client exiting", "err", err)
@@ -19,6 +20,7 @@ func main() {
 	}
 }
 
+// run calls the configured server health endpoint through the generated client.
 func run() error {
 	serverURL := os.Getenv("SERVER_URL")
 	if serverURL == "" {

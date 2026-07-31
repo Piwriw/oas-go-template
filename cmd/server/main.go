@@ -35,6 +35,7 @@ import (
 
 const serviceName = "oas-go-template"
 
+// main parses server flags and exits nonzero when startup or serving fails.
 func main() {
 	configPath := flag.String("c", "config.yaml", "path to config file")
 	flag.Parse()
@@ -48,6 +49,7 @@ func main() {
 	}
 }
 
+// run initializes server dependencies and serves requests until graceful shutdown.
 func run(configPath string) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -90,16 +92,7 @@ func run(configPath string) error {
 	return serveAndWait(ctx, srv, drainState)
 }
 
-// newHTTPServer wires the gin router (recovery + otelgin + logging + optional
-// CORS + request body limit), validates API requests against the embedded OAS
-// document, registers the strict API handler, mounts the Prometheus /metrics
-// route, and applies HTTP timeouts and header limits to defuse common resource
-// attacks. The optional DrainState makes readiness fail before shutdown.
-//
-// The OTel Prometheus exporter (when OTel is enabled in cfg.OTel.Enabled)
-// and client_golang's built-in Go/process collectors both feed
-// prometheus.DefaultRegisterer — /metrics reads from there via
-// promhttp.Handler. No explicit collector registration needed.
+// newHTTPServer wires protected API and metrics routes from the embedded contract and runtime dependencies.
 func newHTTPServer(cfg *config.Config, gdb *gorm.DB, drainStates ...*handler.DrainState) *http.Server {
 	drainState := handler.NewDrainState(cfg.Server.DrainTimeout)
 	if len(drainStates) > 0 && drainStates[0] != nil {
@@ -142,9 +135,7 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB, drainStates ...*handler.Dra
 	}
 }
 
-// openAPISpec loads the generated embedded contract once per server build.
-// Server URLs in the document describe deployment endpoints; they should not
-// make local host validation reject otherwise valid requests.
+// openAPISpec loads and validates the embedded contract for local request validation.
 func openAPISpec() (swaggerSpec *openapi3.T) {
 	swaggerSpec, err := specapi.GetSpec()
 	if err != nil {
@@ -157,6 +148,7 @@ func openAPISpec() (swaggerSpec *openapi3.T) {
 	return swaggerSpec
 }
 
+// openAPIValidator builds middleware that rejects requests outside the embedded API contract.
 func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
 	return ginmiddleware.OapiRequestValidatorWithOptions(swaggerSpec, &ginmiddleware.Options{
 		ErrorHandler:          handler.OAPIValidationError,
@@ -164,16 +156,12 @@ func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
 	})
 }
 
-// serveAndWait opens the listener before entering the signal wait so bind and
-// startup failures are returned directly instead of racing with cancellation.
+// serveAndWait opens the configured listener and coordinates graceful shutdown.
 func serveAndWait(ctx context.Context, srv *http.Server, drainStates ...*handler.DrainState) error {
 	return serveAndWaitWithListener(ctx, srv, net.Listen, drainStates...)
 }
 
-// serveAndWaitWithListener starts srv and blocks until either ctx is canceled
-// or Serve exits. On a signal it marks readiness as draining, waits for the
-// configured endpoint-removal window, and then runs a 10s-bounded Shutdown.
-// listen is injectable so startup failures can be tested without port races.
+// serveAndWaitWithListener serves through an injectable listener and drains readiness before shutdown.
 func serveAndWaitWithListener(
 	ctx context.Context,
 	srv *http.Server,
@@ -231,8 +219,7 @@ func serveAndWaitWithListener(
 	return nil
 }
 
-// shutdownOTel runs the otel shutdown func with a fresh 10s timeout when one
-// was installed. Safe to call with nil.
+// shutdownOTel flushes configured telemetry providers within a bounded timeout.
 func shutdownOTel(shutdown func(context.Context) error) {
 	if shutdown == nil {
 		return

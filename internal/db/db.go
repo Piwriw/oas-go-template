@@ -46,10 +46,7 @@ type Config struct {
 // Disabled reports whether DB is intentionally absent (Driver empty).
 func (c Config) Disabled() bool { return c.Driver == "" }
 
-// Init opens a *gorm.DB for cfg.Driver, registers the OTel tracing plugin so
-// every SQL operation becomes a child span, configures the connection pool,
-// and applies pending schema migrations. Returns (nil, nil) when
-// cfg.Disabled().
+// Init opens the configured database, enables SQL tracing, configures pooling, and applies migrations.
 func Init(ctx context.Context, cfg Config) (*gorm.DB, error) {
 	if cfg.Disabled() {
 		return nil, nil
@@ -135,6 +132,7 @@ func Ping(ctx context.Context, gdb *gorm.DB) error {
 	return sqlDB.PingContext(ctx)
 }
 
+// dialectorFor maps a configured database driver and DSN to its Gorm dialector.
 func dialectorFor(driver, dsn string) (gorm.Dialector, error) {
 	switch driver {
 	case "postgres", "postgresql", "pg":
@@ -148,9 +146,7 @@ func dialectorFor(driver, dsn string) (gorm.Dialector, error) {
 	}
 }
 
-// newLogger builds the gorm logger pipeline. The default gorm logger runs at
-// Warn level (so errors and slow-query notices always surface); a wrapper
-// gates SQL Trace output behind cfg.LogSQL.
+// newLogger builds a Gorm logger that always reports warnings while optionally tracing SQL.
 func newLogger(logSQL bool) gormlogger.Interface {
 	return &sqlToggleLogger{
 		inner:  gormlogger.Default.LogMode(gormlogger.Warn),
@@ -166,22 +162,27 @@ type sqlToggleLogger struct {
 	logSQL bool
 }
 
+// LogMode returns a SQL logger configured for the requested Gorm severity.
 func (l *sqlToggleLogger) LogMode(level gormlogger.LogLevel) gormlogger.Interface {
 	return &sqlToggleLogger{inner: l.inner.LogMode(level), logSQL: l.logSQL}
 }
 
+// Info forwards informational database events to the wrapped Gorm logger.
 func (l *sqlToggleLogger) Info(ctx context.Context, msg string, args ...any) {
 	l.inner.Info(ctx, msg, args...)
 }
 
+// Warn forwards database warnings to the wrapped Gorm logger.
 func (l *sqlToggleLogger) Warn(ctx context.Context, msg string, args ...any) {
 	l.inner.Warn(ctx, msg, args...)
 }
 
+// Error forwards database failures to the wrapped Gorm logger.
 func (l *sqlToggleLogger) Error(ctx context.Context, msg string, args ...any) {
 	l.inner.Error(ctx, msg, args...)
 }
 
+// Trace forwards SQL execution details only when SQL logging is enabled or the operation failed.
 func (l *sqlToggleLogger) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
 	if !l.logSQL {
 		return

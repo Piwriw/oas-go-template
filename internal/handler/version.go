@@ -14,8 +14,7 @@ import (
 // tracer is project-wide; otel.Tracer returns a no-op when Init wasn't called.
 var tracer = otel.Tracer("github.com/piwriw/oas-go-template/internal/handler")
 
-// GetVersion implements api.StrictServerInterface.GetVersion.
-// Demonstrates manual span creation on top of the otelgin middleware.
+// GetVersion returns build metadata and records the lookup in the active request trace.
 func (h *Handler) GetVersion(ctx context.Context, _ api.GetVersionRequestObject) (api.GetVersionResponseObject, error) {
 	_, span := tracer.Start(ctx, "Handler.GetVersion")
 	defer span.End()

@@ -40,10 +40,7 @@ type Config struct {
 	ServiceVersion string `mapstructure:"service_version"`
 }
 
-// Init configures the global TracerProvider and MeterProvider with OTLP HTTP
-// exporters. name and version fall back to cfg.ServiceName / cfg.ServiceVersion
-// when set, otherwise the caller-provided values. Returns a shutdown func;
-// (nil, nil) means OTel is disabled.
+// Init configures global tracing and metrics exporters and returns their coordinated shutdown function.
 func Init(ctx context.Context, cfg Config, defaultName, defaultVersion string) (func(context.Context) error, error) {
 	if !cfg.Enabled {
 		slog.Info("otel: disabled via config, skipping init")
@@ -143,9 +140,7 @@ type endpointConfig struct {
 	insecure bool
 }
 
-// exporterOptions turns an OTLP HTTP URL like "http://localhost:4318" into the
-// trace and metric exporter option slices. Empty input returns no options,
-// letting the SDK fall back to its built-in default (https://localhost:4318).
+// exporterOptions converts one OTLP HTTP endpoint into matching trace and metric exporter settings.
 func exporterOptions(endpoint string) ([]otlptracehttp.Option, []otlpmetrichttp.Option, error) {
 	endpoint = strings.TrimSpace(endpoint)
 	if endpoint == "" {

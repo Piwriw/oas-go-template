@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// TestMiddlewareAccessLogLevels verifies response classes map to the expected access-log severity.
 func TestMiddlewareAccessLogLevels(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -50,6 +51,7 @@ func TestMiddlewareAccessLogLevels(t *testing.T) {
 	}
 }
 
+// TestMiddlewareLogsOperationalAccessOnceAndOnError verifies probe success deduplication and failure logging.
 func TestMiddlewareLogsOperationalAccessOnceAndOnError(t *testing.T) {
 	for _, path := range []string{"/healthz", "/readyz", "/metrics"} {
 		t.Run(path, func(t *testing.T) {
@@ -94,6 +96,7 @@ func TestMiddlewareLogsOperationalAccessOnceAndOnError(t *testing.T) {
 	}
 }
 
+// newTestRouter builds a minimal Gin router with request logging enabled.
 func newTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -101,6 +104,7 @@ func newTestRouter() *gin.Engine {
 	return r
 }
 
+// setDefaultLogger installs a test logger and restores the process logger during cleanup.
 func setDefaultLogger(t *testing.T, logger *slog.Logger) {
 	t.Helper()
 	previous := slog.Default()

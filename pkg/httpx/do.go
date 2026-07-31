@@ -25,16 +25,16 @@ type httpError struct {
 	body       string
 }
 
+// Error formats a non-successful upstream response with request and body context.
 func (e *httpError) Error() string {
 	return fmt.Sprintf("httpx: %s %s -> %d %s: %s",
 		e.method, e.url, e.statusCode, http.StatusText(e.statusCode), e.body)
 }
 
+// Unwrap exposes ErrNon2xx for stable upstream response classification.
 func (e *httpError) Unwrap() error { return ErrNon2xx }
 
-// Do sends one HTTP request (with retries per the client's RetryPolicy)
-// and decodes the JSON response into *T. A non-2xx response is returned
-// as an error wrapping ErrNon2xx.
+// Do sends a policy-aware HTTP request and decodes a successful JSON response into the requested type.
 func Do[T any](ctx context.Context, c *Client, method, url string, body any) (*T, error) {
 	fullURL := joinURL(c.baseURL, url)
 
@@ -90,13 +90,7 @@ func Do[T any](ctx context.Context, c *Client, method, url string, body any) (*T
 	return &out, nil
 }
 
-// DoVoid sends a request with the same retry / tracing / logging as Do,
-// but does not decode the response body. The body is fully drained and
-// closed before returning, so callers can inspect resp.StatusCode and
-// resp.Header without worrying about connection cleanup.
-//
-// Useful for POST/PUT/DELETE endpoints that return only a status code or
-// a body the caller doesn't care about.
+// DoVoid sends a policy-aware HTTP request and drains its successful response without decoding a body.
 func DoVoid(ctx context.Context, c *Client, method, url string, body any) (*http.Response, error) {
 	fullURL := joinURL(c.baseURL, url)
 

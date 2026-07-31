@@ -25,6 +25,7 @@ type logTransport struct {
 	log    *slog.Logger
 }
 
+// RoundTrip records one outbound HTTP attempt with latency, status, and trace correlation.
 func (t logTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.parent.RoundTrip(req)
@@ -62,6 +63,7 @@ type traceTransport struct {
 	parent http.RoundTripper
 }
 
+// RoundTrip traces one outbound HTTP attempt and propagates its context downstream.
 func (t traceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 	attrs := []attribute.KeyValue{
@@ -98,6 +100,7 @@ type retryTransport struct {
 	policy RetryPolicy
 }
 
+// RoundTrip retries eligible transient failures while preserving reusable response connections.
 func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Zero-value policy → no retry, just one attempt through the parent.
 	if t.policy.MaxAttempts <= 0 {
@@ -160,8 +163,7 @@ func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return lastResp, lastErr
 }
 
-// parseRetryAfter parses the Retry-After header, which can be either
-// delta-seconds or an HTTP-date. Returns 0 if unparseable.
+// parseRetryAfter converts an upstream delta-seconds or HTTP-date retry hint into a delay.
 func parseRetryAfter(v string) time.Duration {
 	if v == "" {
 		return 0

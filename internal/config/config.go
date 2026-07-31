@@ -58,11 +58,7 @@ type ServerConfig struct {
 	MaxBodyBytes      int64         `mapstructure:"max_body_bytes"`
 }
 
-// Load reads the YAML file at path, fills defaults, and validates. When path
-// doesn't exist the function falls back to the built-in defaults (so the
-// server still boots in dev/test contexts without a config file). Any other
-// stat / read / decode failure is returned — silently booting with defaults
-// when the user pointed at a broken path would be a footgun in prod.
+// Load merges a YAML file over server defaults and validates the resulting runtime configuration.
 func Load(path string) (*Config, error) {
 	cfg := defaults()
 
@@ -177,6 +173,7 @@ func validate(cfg *Config) error {
 	return nil
 }
 
+// validateCORS rejects unsafe or incomplete cross-origin request policies.
 func validateCORS(cfg CORSConfig) error {
 	if cfg.MaxAge < 0 {
 		return fmt.Errorf("cors.max_age must be non-negative")

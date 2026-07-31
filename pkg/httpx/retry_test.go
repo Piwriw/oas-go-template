@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// TestDefaultRetry verifies the standard transient-failure retry budget and backoff values.
 func TestDefaultRetry(t *testing.T) {
 	p := DefaultRetry()
 	if p.MaxAttempts != 3 {
@@ -26,6 +27,7 @@ func TestDefaultRetry(t *testing.T) {
 	}
 }
 
+// TestRetryPolicy_Backoff_NoJitter verifies deterministic exponential delays respect their cap.
 func TestRetryPolicy_Backoff_NoJitter(t *testing.T) {
 	p := DefaultRetry()
 	p.Jitter = 0
@@ -50,6 +52,7 @@ func TestRetryPolicy_Backoff_NoJitter(t *testing.T) {
 	}
 }
 
+// TestRetryPolicy_Backoff_JitterInRange verifies randomized delays remain within the configured band.
 func TestRetryPolicy_Backoff_JitterInRange(t *testing.T) {
 	p := DefaultRetry() // Jitter 0.2
 	// attempt 2 → base 400ms → jitter ±80ms → range [320ms, 480ms]
@@ -61,6 +64,7 @@ func TestRetryPolicy_Backoff_JitterInRange(t *testing.T) {
 	}
 }
 
+// TestRetryPolicy_Backoff_ZeroPolicy verifies a disabled retry policy adds no delay.
 func TestRetryPolicy_Backoff_ZeroPolicy(t *testing.T) {
 	// Zero-value policy must not panic and must return 0.
 	var p RetryPolicy
@@ -69,6 +73,7 @@ func TestRetryPolicy_Backoff_ZeroPolicy(t *testing.T) {
 	}
 }
 
+// TestShouldRetry_ByMethod verifies retries are limited to configured idempotent HTTP methods.
 func TestShouldRetry_ByMethod(t *testing.T) {
 	p := DefaultRetry()
 	cases := []struct {
@@ -91,6 +96,7 @@ func TestShouldRetry_ByMethod(t *testing.T) {
 	}
 }
 
+// TestShouldRetry_ByStatus verifies only designated transient response statuses are retried.
 func TestShouldRetry_ByStatus(t *testing.T) {
 	p := DefaultRetry()
 	// Per spec §4: only 408, 429, 502, 503, 504 retry. NOT 500.
@@ -108,6 +114,7 @@ func TestShouldRetry_ByStatus(t *testing.T) {
 	}
 }
 
+// TestShouldRetry_ByError verifies network failures retry while context termination does not.
 func TestShouldRetry_ByError(t *testing.T) {
 	p := DefaultRetry()
 
@@ -128,6 +135,7 @@ func TestShouldRetry_ByError(t *testing.T) {
 	}
 }
 
+// TestShouldRetry_ZeroPolicy verifies transient failures do not retry when attempts are disabled.
 func TestShouldRetry_ZeroPolicy(t *testing.T) {
 	var p RetryPolicy
 	if p.shouldRetry("GET", 503, nil) {

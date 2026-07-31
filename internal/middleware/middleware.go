@@ -38,6 +38,7 @@ func Handlers(opts Options, additional ...gin.HandlerFunc) []gin.HandlerFunc {
 	return append(handlers, additional...)
 }
 
+// deprecation emits lifecycle headers declared by the matched deprecated OpenAPI operation.
 func deprecation(spec *openapi3.T) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		op := oas.FindOperation(spec, c.FullPath(), c.Request.Method)
@@ -46,6 +47,7 @@ func deprecation(spec *openapi3.T) gin.HandlerFunc {
 	}
 }
 
+// corsHandler translates validated cross-origin configuration into Gin middleware.
 func corsHandler(cfg config.CORSConfig) gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowOrigins,

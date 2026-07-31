@@ -34,10 +34,7 @@ const (
 //go:embed migrations
 var migrationFiles embed.FS
 
-// Migrate applies pending embedded SQL migrations. A disabled database is a
-// no-op. Successfully applied versions are tracked in schema_migrations by
-// golang-migrate; a failed migration leaves a dirty version and blocks startup
-// until it is repaired explicitly.
+// Migrate applies pending embedded schema changes for an enabled database.
 func Migrate(ctx context.Context, gdb *gorm.DB, cfg Config) error {
 	if cfg.Disabled() {
 		return nil
@@ -48,6 +45,7 @@ func Migrate(ctx context.Context, gdb *gorm.DB, cfg Config) error {
 	return runMigrations(ctx, gdb, cfg, migrationFiles)
 }
 
+// runMigrations validates a migration source and advances the database to its latest version.
 func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, migrationFS fs.FS) (err error) {
 	hasMigrations, err := validateMigrationFiles(migrationFS)
 	if err != nil {
@@ -97,6 +95,7 @@ func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, migrationFS fs
 	return nil
 }
 
+// newMigrationDatabase adapts the active Gorm connection for the configured migration driver.
 func newMigrationDatabase(gdb *gorm.DB, cfg Config) (migratedatabase.Driver, string, error) {
 	driverName, dsn, err := migrationConnectionConfig(cfg)
 	if err != nil {
@@ -147,8 +146,10 @@ type nonClosingMigrationDriver struct {
 	migratedatabase.Driver
 }
 
+// Close preserves the application-owned database connection when migrations release their driver.
 func (nonClosingMigrationDriver) Close() error { return nil }
 
+// migrationConnectionConfig normalizes database aliases and DSNs for the migration library.
 func migrationConnectionConfig(cfg Config) (driverName, dsn string, err error) {
 	switch cfg.Driver {
 	case "postgres", "postgresql", "pg":
@@ -167,6 +168,7 @@ func migrationConnectionConfig(cfg Config) (driverName, dsn string, err error) {
 	}
 }
 
+// validateMigrationFiles ensures every embedded migration version has one up and one down script.
 func validateMigrationFiles(migrationFS fs.FS) (bool, error) {
 	entries, err := fs.ReadDir(migrationFS, migrationDirectory)
 	if err != nil {
@@ -205,14 +207,17 @@ func validateMigrationFiles(migrationFS fs.FS) (bool, error) {
 	return len(directions) > 0, nil
 }
 
+// closeMigrationSource releases the embedded migration source and labels close failures.
 func closeMigrationSource(driver source.Driver) error {
 	return wrapCloseError("migration source", driver.Close())
 }
 
+// closeMigrationDatabase releases the migration adapter without closing the shared SQL connection.
 func closeMigrationDatabase(driver migratedatabase.Driver) error {
 	return wrapCloseError("migration database", driver.Close())
 }
 
+// wrapCloseError adds migration resource context to non-nil cleanup failures.
 func wrapCloseError(name string, err error) error {
 	if err == nil {
 		return nil

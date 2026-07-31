@@ -15,6 +15,7 @@ type echoResp struct {
 	Echoed string `json:"echoed"`
 }
 
+// TestHttpError_Error_Format verifies upstream failure messages retain request and response context.
 func TestHttpError_Error_Format(t *testing.T) {
 	e := &httpError{
 		method:     "GET",
@@ -37,6 +38,7 @@ func TestHttpError_Error_Format(t *testing.T) {
 	}
 }
 
+// TestHttpError_Unwrap_ErrNon2xx verifies HTTP failures match the public non-2xx sentinel.
 func TestHttpError_Unwrap_ErrNon2xx(t *testing.T) {
 	e := &httpError{statusCode: 500}
 	if !errors.Is(e, ErrNon2xx) {
@@ -44,12 +46,14 @@ func TestHttpError_Unwrap_ErrNon2xx(t *testing.T) {
 	}
 }
 
+// TestErrNon2xx_DoesNotMatchOtherErrors verifies unrelated failures remain distinguishable from HTTP responses.
 func TestErrNon2xx_DoesNotMatchOtherErrors(t *testing.T) {
 	if errors.Is(errors.New("other"), ErrNon2xx) {
 		t.Errorf("plain error should not match ErrNon2xx")
 	}
 }
 
+// TestDo_Get_Success verifies successful GET responses decode into the requested model.
 func TestDo_Get_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -67,6 +71,7 @@ func TestDo_Get_Success(t *testing.T) {
 	}
 }
 
+// TestDo_Get_204_NoBody verifies no-content responses return a zero-value model without decoding errors.
 func TestDo_Get_204_NoBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -86,6 +91,7 @@ func TestDo_Get_204_NoBody(t *testing.T) {
 	}
 }
 
+// TestDo_Post_RequestBody verifies request models are serialized into outbound JSON bodies.
 func TestDo_Post_RequestBody(t *testing.T) {
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +114,7 @@ func TestDo_Post_RequestBody(t *testing.T) {
 	}
 }
 
+// TestDo_Post_SetsContentType verifies JSON requests advertise content and acceptance media types.
 func TestDo_Post_SetsContentType(t *testing.T) {
 	var gotCT string
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -125,6 +132,7 @@ func TestDo_Post_SetsContentType(t *testing.T) {
 	}
 }
 
+// TestDo_Non2xx_ReturnsErrNon2xx verifies unsuccessful responses expose status, body, and sentinel classification.
 func TestDo_Non2xx_ReturnsErrNon2xx(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -148,6 +156,7 @@ func TestDo_Non2xx_ReturnsErrNon2xx(t *testing.T) {
 	}
 }
 
+// TestDo_NetworkError verifies transport failures retain their underlying network cause.
 func TestDo_NetworkError(t *testing.T) {
 	c := New()
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
@@ -161,6 +170,7 @@ func TestDo_NetworkError(t *testing.T) {
 	}
 }
 
+// TestDo_BaseURL_Joined verifies relative request paths are nested beneath the configured API base.
 func TestDo_BaseURL_Joined(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -180,6 +190,7 @@ func TestDo_BaseURL_Joined(t *testing.T) {
 	}
 }
 
+// TestDo_BodyTruncatedInError verifies large upstream error bodies are bounded in returned messages.
 func TestDo_BodyTruncatedInError(t *testing.T) {
 	big := strings.Repeat("x", 5000)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -198,6 +209,7 @@ func TestDo_BodyTruncatedInError(t *testing.T) {
 	}
 }
 
+// TestDoVoid_Success_ReturnsResponseWithClosedBody verifies bodyless calls drain responses while preserving metadata.
 func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-Foo", "bar")
@@ -224,6 +236,7 @@ func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
 	}
 }
 
+// TestDoVoid_Non2xx_ReturnsErrNon2xx verifies bodyless calls classify unsuccessful upstream responses.
 func TestDoVoid_Non2xx_ReturnsErrNon2xx(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)

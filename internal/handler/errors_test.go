@@ -14,6 +14,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/errcode"
 )
 
+// decodeAPIError parses a recorded handler response into the public error schema.
 func decodeAPIError(t *testing.T, rec *httptest.ResponseRecorder) api.Error {
 	t.Helper()
 	var body api.Error
@@ -23,6 +24,7 @@ func decodeAPIError(t *testing.T, rec *httptest.ResponseRecorder) api.Error {
 	return body
 }
 
+// TestStrictServerOptionsSanitizesInternalErrors verifies generated handler failures never expose private details.
 func TestStrictServerOptionsSanitizesInternalErrors(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -43,6 +45,7 @@ func TestStrictServerOptionsSanitizesInternalErrors(t *testing.T) {
 	}
 }
 
+// TestRecoveryUsesSanitizedAPIError verifies panic recovery returns the stable public error schema.
 func TestRecoveryUsesSanitizedAPIError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -63,6 +66,7 @@ func TestRecoveryUsesSanitizedAPIError(t *testing.T) {
 	}
 }
 
+// TestOAPIValidationErrorUsesStableResponse verifies contract validation failures return sanitized API errors.
 func TestOAPIValidationErrorUsesStableResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

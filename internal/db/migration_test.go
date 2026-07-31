@@ -18,6 +18,7 @@ const (
 	migrationTestDropFile   = "migrations/" + migrationTestVersion + "_create_widgets.down.sql"
 )
 
+// TestRunMigrations_appliesAndSkipsRecordedVersion verifies applied schema versions are recorded and not replayed.
 func TestRunMigrations_appliesAndSkipsRecordedVersion(t *testing.T) {
 	cfg := migrationTestConfig(t)
 	gdb := openMigrationTestDB(t, cfg.DSN)
@@ -60,6 +61,7 @@ func TestRunMigrations_appliesAndSkipsRecordedVersion(t *testing.T) {
 	}
 }
 
+// TestRunMigrations_failedSQLLeavesDirtyVersion verifies failed schema changes block startup with a dirty version.
 func TestRunMigrations_failedSQLLeavesDirtyVersion(t *testing.T) {
 	cfg := migrationTestConfig(t)
 	gdb := openMigrationTestDB(t, cfg.DSN)
@@ -84,6 +86,7 @@ func TestRunMigrations_failedSQLLeavesDirtyVersion(t *testing.T) {
 	}
 }
 
+// TestValidateMigrationFiles verifies embedded schema versions require paired up and down scripts.
 func TestValidateMigrationFiles(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -119,12 +122,14 @@ func TestValidateMigrationFiles(t *testing.T) {
 	}
 }
 
+// TestMigrate_disabledDBIsNoop verifies schema migration is skipped when database support is disabled.
 func TestMigrate_disabledDBIsNoop(t *testing.T) {
 	if err := Migrate(context.Background(), nil, Config{}); err != nil {
 		t.Fatalf("Migrate disabled DB: %v", err)
 	}
 }
 
+// validMigrationFS builds one paired in-memory migration version for database tests.
 func validMigrationFS(upSQL, downSQL string) fstest.MapFS {
 	return fstest.MapFS{
 		migrationTestCreateFile: {Data: []byte(upSQL)},
@@ -132,6 +137,7 @@ func validMigrationFS(upSQL, downSQL string) fstest.MapFS {
 	}
 }
 
+// migrationTestConfig returns an isolated SQLite configuration for one migration test.
 func migrationTestConfig(t *testing.T) Config {
 	t.Helper()
 	return Config{
@@ -140,6 +146,7 @@ func migrationTestConfig(t *testing.T) Config {
 	}
 }
 
+// openMigrationTestDB opens a disposable SQLite connection for migration assertions.
 func openMigrationTestDB(t *testing.T, dsn string) *gorm.DB {
 	t.Helper()
 

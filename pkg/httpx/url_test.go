@@ -2,6 +2,7 @@ package httpx
 
 import "testing"
 
+// TestJoinURL verifies API base paths, relative paths, and absolute overrides compose correctly.
 func TestJoinURL(t *testing.T) {
 	cases := []struct {
 		name string

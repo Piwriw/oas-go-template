@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// writeFile creates a temporary YAML configuration fixture and returns its path.
 func writeFile(t *testing.T, dir, body string) string {
 	t.Helper()
 	p := filepath.Join(dir, "config.yaml")
@@ -16,6 +17,7 @@ func writeFile(t *testing.T, dir, body string) string {
 	return p
 }
 
+// TestLoad_fullYAML verifies every supported YAML section overrides its runtime default.
 func TestLoad_fullYAML(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -72,6 +74,7 @@ otel:
 	}
 }
 
+// TestLoad_corsYAML verifies cross-origin policy fields decode from YAML.
 func TestLoad_corsYAML(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -96,6 +99,7 @@ cors:
 	}
 }
 
+// TestLoad_serverProtectionYAML verifies HTTP resource limits and timeouts decode from YAML.
 func TestLoad_serverProtectionYAML(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -126,6 +130,7 @@ server:
 	}
 }
 
+// TestLoad_missingFileFallsBackToDefaults verifies absent explicit configuration retains operational defaults.
 func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	// Any path that doesn't exist → no error, defaults returned so dev/test
 	// workflows don't need to author a config file.
@@ -159,6 +164,7 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	}
 }
 
+// TestLoad_defaultPathMissingOK verifies a missing conventional config path does not prevent local startup.
 func TestLoad_defaultPathMissingOK(t *testing.T) {
 	// Switch into a temp dir so the default "config.yaml" doesn't exist.
 	dir := t.TempDir()
@@ -185,6 +191,7 @@ func TestLoad_defaultPathMissingOK(t *testing.T) {
 	}
 }
 
+// TestLoad_invalidGinMode verifies unsupported Gin modes fail configuration validation.
 func TestLoad_invalidGinMode(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -196,6 +203,7 @@ server:
 	}
 }
 
+// TestLoad_dbDriverWithoutDSN verifies enabled database configurations require connection details.
 func TestLoad_dbDriverWithoutDSN(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -208,6 +216,7 @@ db:
 	}
 }
 
+// TestLoad_invalidLogFormat verifies unsupported structured log encodings are rejected.
 func TestLoad_invalidLogFormat(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, `
@@ -219,6 +228,7 @@ log:
 	}
 }
 
+// TestLoad_rejectsNegativeServerProtectionValues verifies HTTP timeouts and limits cannot be negative.
 func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
 	tests := map[string]string{
 		"read timeout":     "read_timeout: -1s",
@@ -237,6 +247,7 @@ func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
 	}
 }
 
+// TestLoad_rejectsInvalidCORSConfig verifies unsafe or incomplete cross-origin policies are rejected.
 func TestLoad_rejectsInvalidCORSConfig(t *testing.T) {
 	tests := map[string]string{
 		"enabled without origins": `cors:
@@ -265,9 +276,7 @@ func TestLoad_rejectsInvalidCORSConfig(t *testing.T) {
 	}
 }
 
-// viper.Unmarshal zero-fills fields that exist in the struct but aren't in
-// the YAML. This test pins the contract: if a yaml is missing a nested field,
-// the default for that field is preserved.
+// TestLoad_partialYAMLPreservesDefaults verifies omitted YAML fields retain built-in runtime values.
 func TestLoad_partialYAMLPreservesDefaults(t *testing.T) {
 	dir := t.TempDir()
 	// Only set server.http_addr; everything else relies on built-in defaults.

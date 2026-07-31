@@ -9,8 +9,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/version"
 )
 
-// GetHealth implements api.StrictServerInterface.GetHealth — liveness only.
-// Returns 200 as long as the process is up; dependency checks live in GetReady.
+// GetHealth reports process liveness without probing optional dependencies.
 func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
 	v := version.Info().Version
 	return api.GetHealth200JSONResponse(api.Health{
@@ -19,13 +18,7 @@ func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (ap
 	}), nil
 }
 
-// GetReady implements api.StrictServerInterface.GetReady — readiness probe.
-// Returns 200 when every configured dependency is reachable. A nil DB means
-// the database is intentionally disabled, so there is nothing to check.
-//
-// Errors are intentionally converted to typed 503 responses and paired with
-// a nil return error — StrictServerInterface convention. Returning the raw
-// err would route to gin's generic 500 path and discard the structured body.
+// GetReady reports whether the server is accepting traffic and configured dependencies are reachable.
 func (h *Handler) GetReady(ctx context.Context, _ api.GetReadyRequestObject) (api.GetReadyResponseObject, error) {
 	if h.drainState != nil && h.drainState.Draining() {
 		return api.GetReady503JSONResponse(api.Error{

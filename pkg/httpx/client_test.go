@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestNew_Defaults verifies new clients use package timeout, retry, transport, and logger defaults.
 func TestNew_Defaults(t *testing.T) {
 	c := New()
 	if c == nil {
@@ -24,6 +25,7 @@ func TestNew_Defaults(t *testing.T) {
 	}
 }
 
+// TestNew_CustomTransport_WrappedByChain verifies custom transports remain behind the policy decorator chain.
 func TestNew_CustomTransport_WrappedByChain(t *testing.T) {
 	custom := &countingTransport{}
 	c := New(WithTransport(custom))
@@ -46,11 +48,13 @@ func TestNew_CustomTransport_WrappedByChain(t *testing.T) {
 
 type countingTransport struct{ calls int }
 
+// RoundTrip counts outbound attempts before delegating to the wrapped transport.
 func (t *countingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.calls++
 	return http.DefaultTransport.RoundTrip(req)
 }
 
+// newOKServer starts a disposable JSON endpoint for HTTP client wrapper tests.
 func newOKServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -62,6 +66,7 @@ type wrapper struct {
 	Field string `json:"field"`
 }
 
+// TestGet_Wrapper verifies the GET convenience wrapper decodes successful JSON.
 func TestGet_Wrapper(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -82,6 +87,7 @@ func TestGet_Wrapper(t *testing.T) {
 	}
 }
 
+// TestPost_Wrapper verifies the POST convenience wrapper sends and decodes JSON.
 func TestPost_Wrapper(t *testing.T) {
 	var gotMethod string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +110,7 @@ func TestPost_Wrapper(t *testing.T) {
 	}
 }
 
+// TestPut_Patch_Delete_Wrappers verifies method-specific wrappers dispatch the expected HTTP verbs.
 func TestPut_Patch_Delete_Wrappers(t *testing.T) {
 	var gotMethod string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -140,6 +147,7 @@ func TestPut_Patch_Delete_Wrappers(t *testing.T) {
 	}
 }
 
+// TestPostVoid_Etc verifies bodyless convenience wrappers preserve successful response metadata.
 func TestPostVoid_Etc(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusAccepted)

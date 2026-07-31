@@ -13,9 +13,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/logging"
 )
 
-// StrictServerOptions replaces the generated handler's default {"msg": ...}
-// errors with the public api.Error shape. Detailed errors are logged with the
-// request ID and trace context, while callers receive stable messages only.
+// StrictServerOptions maps generated binding failures to the stable public API error schema.
 func StrictServerOptions() api.StrictGinServerOptions {
 	return api.StrictGinServerOptions{
 		RequestErrorHandlerFunc: func(c *gin.Context, err error) {
@@ -34,16 +32,14 @@ func StrictServerOptions() api.StrictGinServerOptions {
 	}
 }
 
-// Recovery returns a panic recovery middleware that keeps the public error
-// shape consistent with handler and request parsing failures.
+// Recovery converts handler panics into sanitized API error responses.
 func Recovery() gin.HandlerFunc {
 	return gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, recovered any) {
 		writeError(c, http.StatusInternalServerError, errcode.Internal, "internal server error", fmt.Errorf("panic recovered: %v\n%s", recovered, debug.Stack()))
 	})
 }
 
-// BodyLimit caps request bodies before they reach a generated binder or handler.
-// A non-positive limit disables this application-level check.
+// BodyLimit rejects oversized request bodies before contract binding and handler execution.
 func BodyLimit(maxBytes int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if maxBytes <= 0 {
@@ -59,8 +55,7 @@ func BodyLimit(maxBytes int64) gin.HandlerFunc {
 	}
 }
 
-// OAPIValidationError adapts gin-middleware's callback to the common error
-// response. The validator's detailed message remains in the log only.
+// OAPIValidationError sanitizes OpenAPI request validation failures for API callers.
 func OAPIValidationError(c *gin.Context, message string, statusCode int) {
 	code := errcode.InvalidRequest
 	publicMessage := "invalid request"
@@ -81,12 +76,12 @@ func NoMethod(c *gin.Context) {
 	writeError(c, http.StatusMethodNotAllowed, errcode.MethodNotAllowed, "method not allowed", fmt.Errorf("%s %s", c.Request.Method, c.Request.URL.Path))
 }
 
-// Forbidden writes the common 403 response. Middleware should pass the
-// detailed reason for logging while callers receive a stable message.
+// Forbidden writes a stable 403 response while retaining the detailed reason in logs.
 func Forbidden(c *gin.Context, detail error) {
 	writeError(c, http.StatusForbidden, errcode.Forbidden, "forbidden", detail)
 }
 
+// writeError logs private failure details and writes the sanitized public API error body.
 func writeError(c *gin.Context, status int, code errcode.Code, message string, detail error) {
 	logger := logging.From(c)
 	args := []any{"status", status, "code", int32(code)}

@@ -14,9 +14,7 @@ type DrainState struct {
 	timeout  time.Duration
 }
 
-// NewDrainState creates a readiness state. An omitted timeout defaults to five
-// seconds; callers may pass zero to skip the wait or a positive timeout to let
-// load balancers observe the 503 readiness response before shutdown.
+// NewDrainState creates readiness drain tracking with an optional endpoint-removal delay.
 func NewDrainState(timeout ...time.Duration) *DrainState {
 	drainTimeout := defaultDrainTimeout
 	if len(timeout) > 0 {

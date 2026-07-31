@@ -7,6 +7,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// TestValidateVersioningPolicy verifies business routes follow declared URL versioning and operational exceptions.
 func TestValidateVersioningPolicy(t *testing.T) {
 	doc := testDocument()
 	if err := Validate(doc); err != nil {
@@ -19,6 +20,7 @@ func TestValidateVersioningPolicy(t *testing.T) {
 	}
 }
 
+// TestValidateDeprecationMetadata verifies deprecated operations declare ordered RFC3339 lifecycle dates.
 func TestValidateDeprecationMetadata(t *testing.T) {
 	doc := testDocument()
 	op := doc.Paths.Find("/v1/orders/{orderID}").Get
@@ -53,6 +55,7 @@ func TestValidateDeprecationMetadata(t *testing.T) {
 	}
 }
 
+// TestFindOperationAndApplyDeprecationHeaders verifies Gin routes resolve to operations and emit lifecycle headers.
 func TestFindOperationAndApplyDeprecationHeaders(t *testing.T) {
 	doc := testDocument()
 	op := FindOperation(doc, "/v1/orders/:orderID", http.MethodGet)
@@ -80,10 +83,12 @@ func TestFindOperationAndApplyDeprecationHeaders(t *testing.T) {
 
 type headerCapture map[string]string
 
+// Header captures emitted response metadata for deprecation assertions.
 func (h headerCapture) Header(name, value string) {
 	h[name] = value
 }
 
+// testDocument builds a minimal versioned OpenAPI contract for policy tests.
 func testDocument() *openapi3.T {
 	return &openapi3.T{
 		Extensions: map[string]any{

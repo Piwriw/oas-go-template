@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestGetVersionWithResponseParsesTypedErrorStatuses verifies generated clients decode every declared error response.
 func TestGetVersionWithResponseParsesTypedErrorStatuses(t *testing.T) {
 	statuses := []int{
 		http.StatusBadRequest,
@@ -48,6 +49,7 @@ func TestGetVersionWithResponseParsesTypedErrorStatuses(t *testing.T) {
 	}
 }
 
+// typedErrorForStatus selects the generated typed API error field for an HTTP status.
 func typedErrorForStatus(response *GetVersionResponse, status int) *Error {
 	switch status {
 	case http.StatusBadRequest:

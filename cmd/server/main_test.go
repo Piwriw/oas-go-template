@@ -21,6 +21,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/handler"
 )
 
+// testConfig returns isolated server defaults with telemetry and draining disabled.
 func testConfig() *config.Config {
 	return &config.Config{
 		Server: config.ServerConfig{
@@ -36,6 +37,7 @@ func testConfig() *config.Config {
 	}
 }
 
+// TestServeAndWaitMarksReadinessDrainingBeforeShutdown verifies shutdown removes readiness before closing HTTP service.
 func TestServeAndWaitMarksReadinessDrainingBeforeShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -50,6 +52,7 @@ func TestServeAndWaitMarksReadinessDrainingBeforeShutdown(t *testing.T) {
 	}
 }
 
+// TestServeAndWaitListenErrorTakesPriorityOverCanceledContext preserves bind failures during cancellation.
 func TestServeAndWaitListenErrorTakesPriorityOverCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -70,6 +73,7 @@ func TestServeAndWaitListenErrorTakesPriorityOverCanceledContext(t *testing.T) {
 	}
 }
 
+// TestMetricsEndpointServesGoRuntimeMetrics verifies the operational metrics route exposes process collectors.
 func TestMetricsEndpointServesGoRuntimeMetrics(t *testing.T) {
 	cfg := testConfig()
 	srv := newHTTPServer(cfg, nil)
@@ -92,6 +96,7 @@ func TestMetricsEndpointServesGoRuntimeMetrics(t *testing.T) {
 	}
 }
 
+// TestHealthEndpointPassesOASValidation verifies the liveness route conforms to its embedded contract.
 func TestHealthEndpointPassesOASValidation(t *testing.T) {
 	srv := newHTTPServer(testConfig(), nil)
 	rec := httptest.NewRecorder()
@@ -102,6 +107,7 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 	}
 }
 
+// TestReadinessReturns503WhileDraining verifies the readiness route rejects traffic during shutdown drain.
 func TestReadinessReturns503WhileDraining(t *testing.T) {
 	drainState := handler.NewDrainState(0)
 	srv := newHTTPServer(testConfig(), nil, drainState)
@@ -122,6 +128,7 @@ func TestReadinessReturns503WhileDraining(t *testing.T) {
 	}
 }
 
+// TestCORSIsDisabledByDefault verifies ordinary responses omit cross-origin headers without explicit policy.
 func TestCORSIsDisabledByDefault(t *testing.T) {
 	srv := newHTTPServer(testConfig(), nil)
 	rec := httptest.NewRecorder()
@@ -137,6 +144,7 @@ func TestCORSIsDisabledByDefault(t *testing.T) {
 	}
 }
 
+// TestCORSAllowedOriginAndPreflight verifies approved origins receive response and preflight access headers.
 func TestCORSAllowedOriginAndPreflight(t *testing.T) {
 	cfg := testConfig()
 	cfg.CORS = config.CORSConfig{
@@ -196,6 +204,7 @@ func TestCORSAllowedOriginAndPreflight(t *testing.T) {
 	})
 }
 
+// TestCORSRejectsDisallowedOrigin verifies unapproved browser origins receive a stable forbidden response.
 func TestCORSRejectsDisallowedOrigin(t *testing.T) {
 	cfg := testConfig()
 	cfg.CORS = config.CORSConfig{
@@ -220,6 +229,7 @@ func TestCORSRejectsDisallowedOrigin(t *testing.T) {
 	}
 }
 
+// TestOASValidatorRejectsMissingRequiredQuery verifies contract-required inputs are enforced before handlers run.
 func TestOASValidatorRejectsMissingRequiredQuery(t *testing.T) {
 	spec := openAPISpec()
 	typeValue := openapi3.Types{openapi3.TypeString}
@@ -254,6 +264,7 @@ func TestOASValidatorRejectsMissingRequiredQuery(t *testing.T) {
 	}
 }
 
+// TestRoutingErrorsUseAPIError verifies unknown routes and methods use the shared public error schema.
 func TestRoutingErrorsUseAPIError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -286,6 +297,7 @@ func TestRoutingErrorsUseAPIError(t *testing.T) {
 	}
 }
 
+// TestRequestBodyLimitUsesAPIError verifies oversized payloads return the shared public error schema.
 func TestRequestBodyLimitUsesAPIError(t *testing.T) {
 	cfg := testConfig()
 	cfg.Server.MaxBodyBytes = 4
@@ -306,6 +318,7 @@ func TestRequestBodyLimitUsesAPIError(t *testing.T) {
 	}
 }
 
+// TestHTTPServerProtectionConfig verifies configured timeout and header protections reach the HTTP server.
 func TestHTTPServerProtectionConfig(t *testing.T) {
 	cfg := testConfig()
 	srv := newHTTPServer(cfg, nil)

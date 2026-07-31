@@ -32,8 +32,7 @@ type RetryPolicy struct {
 	Jitter float64
 }
 
-// DefaultRetry returns the package's default retry policy:
-// up to 3 attempts, 100ms initial backoff, 2s cap, 2× growth, ±20% jitter.
+// DefaultRetry returns bounded exponential backoff suitable for transient upstream failures.
 func DefaultRetry() RetryPolicy {
 	return RetryPolicy{
 		MaxAttempts: 3,
@@ -44,9 +43,7 @@ func DefaultRetry() RetryPolicy {
 	}
 }
 
-// backoff returns the duration to wait before the next attempt, given that
-// `attempt` failures have already happened (attempt = 0 → first retry).
-// Returns 0 for a zero-value RetryPolicy (caller did not configure retry).
+// backoff computes the capped jittered delay after the specified failed request attempt.
 func (p RetryPolicy) backoff(attempt int) time.Duration {
 	if p.Initial <= 0 || p.Multiplier <= 0 {
 		return 0
@@ -66,14 +63,7 @@ func (p RetryPolicy) backoff(attempt int) time.Duration {
 	return time.Duration(d)
 }
 
-// shouldRetry reports whether a failed attempt should be retried.
-//
-// Rules (all must hold):
-//   - policy is non-zero (MaxAttempts > 0)
-//   - method is GET, HEAD, PUT, or DELETE (idempotent)
-//   - status is 408, 429, 502, 503, 504, OR err is a non-context network error
-//
-// Context cancellation / deadline never retries — caller wanted to give up.
+// shouldRetry permits transient failures only for configured idempotent requests with active contexts.
 func (p RetryPolicy) shouldRetry(method string, status int, err error) bool {
 	if p.MaxAttempts <= 0 {
 		return false

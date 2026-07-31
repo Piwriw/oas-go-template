@@ -157,6 +157,7 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **Function comments**: every named function and method in non-generated Go code, including tests and test helpers, must have exactly one concise comment line immediately above its declaration. Use `// FunctionName ...`, start with the exact function name, and describe the concrete business responsibility rather than restating the signature. Anonymous functions are exempt; never edit `*.gen.go` to add comments.
 - **Named constants at the top**: package-scoped fixed values, especially repeated strings and values used in control flow (route paths, context keys, header names, etc.), belong in a named `const` block immediately after the imports. Do not scatter string literals through `switch` cases or conditionals.
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
 - **`os.Exit(0)` after defers**: gocritic's `exitAfterDefer` will fail lint. `main` returns through `run()` and exits via `os.Exit(1)` only on error — keep it that way.

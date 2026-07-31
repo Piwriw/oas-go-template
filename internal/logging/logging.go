@@ -40,8 +40,7 @@ type LogConfig struct {
 	Level  string `mapstructure:"level"`
 }
 
-// New returns the base *slog.Logger writing to stderr. Pass the LogConfig from
-// the central config so defaults have already been applied.
+// New builds the process logger from the validated output format and severity configuration.
 func New(cfg LogConfig) *slog.Logger {
 	opts := &slog.HandlerOptions{Level: parseLevel(cfg.Level)}
 	var inner slog.Handler
@@ -53,15 +52,7 @@ func New(cfg LogConfig) *slog.Logger {
 	return slog.New(&otelHandler{inner: inner})
 }
 
-// Middleware generates (or accepts) a request_id per request, stores it in the gin
-// context, mirrors it back via X-Request-ID response header, and writes one structured
-// access log for application requests. Operational endpoints log their first
-// successful request and all errors; repeated successes are omitted. The base
-// logger is the project-wide slog.Default().
-//
-// Note: slog.Default() is captured once per middleware build so request hot path
-// does one With() rather than two Default() lookups (Default() walks an atomic
-// each call).
+// Middleware attaches request and trace identifiers and emits rate-limited structured access logs.
 func Middleware() gin.HandlerFunc {
 	base := slog.Default()
 	var loggedOperationalPaths sync.Map
@@ -97,6 +88,7 @@ func Middleware() gin.HandlerFunc {
 	}
 }
 
+// skipAccessLog suppresses repeated successful logs for high-frequency operational endpoints.
 func skipAccessLog(path string, status int, logged *sync.Map) bool {
 	if status >= http.StatusBadRequest {
 		return false
@@ -110,6 +102,7 @@ func skipAccessLog(path string, status int, logged *sync.Map) bool {
 	}
 }
 
+// accessLogLevel maps an HTTP response status to its operational log severity.
 func accessLogLevel(status int) slog.Level {
 	switch {
 	case status >= 500:
@@ -148,10 +141,12 @@ type otelHandler struct {
 	inner slog.Handler
 }
 
+// Enabled delegates severity filtering to the wrapped structured log handler.
 func (h *otelHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return h.inner.Enabled(ctx, level)
 }
 
+// Handle enriches log records with active OpenTelemetry trace identifiers before writing them.
 func (h *otelHandler) Handle(ctx context.Context, record slog.Record) error {
 	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
 		record.AddAttrs(
@@ -162,14 +157,17 @@ func (h *otelHandler) Handle(ctx context.Context, record slog.Record) error {
 	return h.inner.Handle(ctx, record)
 }
 
+// WithAttrs preserves trace enrichment while adding persistent structured fields.
 func (h *otelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &otelHandler{inner: h.inner.WithAttrs(attrs)}
 }
 
+// WithGroup preserves trace enrichment while nesting subsequent structured fields.
 func (h *otelHandler) WithGroup(name string) slog.Handler {
 	return &otelHandler{inner: h.inner.WithGroup(name)}
 }
 
+// parseLevel converts configured log-level aliases to their slog severity.
 func parseLevel(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":
@@ -183,6 +181,7 @@ func parseLevel(s string) slog.Level {
 	}
 }
 
+// randomID creates a request correlation identifier without external state.
 func randomID() string {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {

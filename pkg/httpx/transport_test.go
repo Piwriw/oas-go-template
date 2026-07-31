@@ -20,14 +20,14 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
+// newTestLogger captures structured transport logs for assertion.
 func newTestLogger() (*slog.Logger, *bytes.Buffer) {
 	var buf bytes.Buffer
 	h := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
 	return slog.New(h), &buf
 }
 
-// closeBody silences bodyclose/errcheck on responses whose body we don't
-// otherwise read in a test.
+// closeBody drains and closes test responses so connections and lint checks remain clean.
 func closeBody(t *testing.T, resp *http.Response) {
 	t.Helper()
 	if resp == nil {
@@ -39,10 +39,12 @@ func closeBody(t *testing.T, resp *http.Response) {
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
+// RoundTrip adapts a test function into an HTTP transport.
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+// TestLogTransport_2xx_Info verifies successful upstream attempts produce informational logs.
 func TestLogTransport_2xx_Info(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -71,6 +73,7 @@ func TestLogTransport_2xx_Info(t *testing.T) {
 	}
 }
 
+// TestLogTransport_4xx_Warn verifies client-error upstream responses produce warning logs.
 func TestLogTransport_4xx_Warn(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -93,6 +96,7 @@ func TestLogTransport_4xx_Warn(t *testing.T) {
 	}
 }
 
+// TestLogTransport_5xx_Warn verifies server-error upstream responses produce warning logs.
 func TestLogTransport_5xx_Warn(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
@@ -118,6 +122,7 @@ func TestLogTransport_5xx_Warn(t *testing.T) {
 	}
 }
 
+// TestLogTransport_NetworkError_Error verifies transport failures produce error logs with their cause.
 func TestLogTransport_NetworkError_Error(t *testing.T) {
 	log, buf := newTestLogger()
 	rt := logTransport{parent: http.DefaultTransport, log: log}
@@ -139,6 +144,7 @@ func TestLogTransport_NetworkError_Error(t *testing.T) {
 	}
 }
 
+// TestLogTransport_ElapsedAndMethodRecorded verifies access logs include request method and latency.
 func TestLogTransport_ElapsedAndMethodRecorded(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -164,13 +170,12 @@ func TestLogTransport_ElapsedAndMethodRecorded(t *testing.T) {
 	}
 }
 
+// newTracerProviderWithExporter builds a synchronous in-memory trace provider for transport assertions.
 func newTracerProviderWithExporter(exp *tracetest.InMemoryExporter) *sdktrace.TracerProvider {
 	return sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 }
 
-// withTestPropagator installs the W3C TraceContext propagator for the
-// duration of the test, restoring whatever was previously registered.
-// Production code expects internal/otel.Init to do this once at startup.
+// withTestPropagator installs W3C trace propagation for a test and restores the prior global setting.
 func withTestPropagator(t *testing.T) {
 	t.Helper()
 	orig := otel.GetTextMapPropagator()
@@ -178,6 +183,7 @@ func withTestPropagator(t *testing.T) {
 	t.Cleanup(func() { otel.SetTextMapPropagator(orig) })
 }
 
+// TestTraceTransport_CreatesSpanAndInjectsHeaders verifies outbound attempts create spans and propagate trace context.
 func TestTraceTransport_CreatesSpanAndInjectsHeaders(t *testing.T) {
 	withTestPropagator(t)
 	exp := tracetest.NewInMemoryExporter()
@@ -220,6 +226,7 @@ func TestTraceTransport_CreatesSpanAndInjectsHeaders(t *testing.T) {
 	}
 }
 
+// TestTraceTransport_5xxMarksError verifies upstream server failures mark client spans as errors.
 func TestTraceTransport_5xxMarksError(t *testing.T) {
 	withTestPropagator(t)
 	exp := tracetest.NewInMemoryExporter()
@@ -255,6 +262,7 @@ func TestTraceTransport_5xxMarksError(t *testing.T) {
 	}
 }
 
+// TestRetryTransport_RetriesOn5xxThenSucceeds verifies transient server failures retry until success.
 func TestRetryTransport_RetriesOn5xxThenSucceeds(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -284,6 +292,7 @@ func TestRetryTransport_RetriesOn5xxThenSucceeds(t *testing.T) {
 	}
 }
 
+// TestRetryTransport_DoesNotRetryOn4xx verifies permanent client errors return after one attempt.
 func TestRetryTransport_DoesNotRetryOn4xx(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -309,6 +318,7 @@ func TestRetryTransport_DoesNotRetryOn4xx(t *testing.T) {
 	}
 }
 
+// TestRetryTransport_DoesNotRetryOnPOST verifies non-idempotent requests are never replayed.
 func TestRetryTransport_DoesNotRetryOnPOST(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -331,6 +341,7 @@ func TestRetryTransport_DoesNotRetryOnPOST(t *testing.T) {
 	}
 }
 
+// TestRetryTransport_RespectsMaxAttempts verifies persistent failures stop at the configured attempt budget.
 func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -356,6 +367,7 @@ func TestRetryTransport_RespectsMaxAttempts(t *testing.T) {
 	}
 }
 
+// TestRetryTransport_FinalAttemptReturnsImmediatelyWithReadableBody verifies readable final failures without backoff.
 func TestRetryTransport_FinalAttemptReturnsImmediatelyWithReadableBody(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -396,6 +408,7 @@ func TestRetryTransport_FinalAttemptReturnsImmediatelyWithReadableBody(t *testin
 	}
 }
 
+// TestRetryTransport_ContextCancelStopsRetries verifies cancellation interrupts retry backoff and further attempts.
 func TestRetryTransport_ContextCancelStopsRetries(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -425,6 +438,7 @@ func TestRetryTransport_ContextCancelStopsRetries(t *testing.T) {
 	}
 }
 
+// TestRetryTransport_RetriesOnNetworkError verifies transient transport failures retry idempotent requests.
 func TestRetryTransport_RetriesOnNetworkError(t *testing.T) {
 	policy := RetryPolicy{MaxAttempts: 3, Initial: time.Millisecond, Max: 5 * time.Millisecond, Multiplier: 2, Jitter: 0}
 	rt := retryTransport{parent: http.DefaultTransport, policy: policy}

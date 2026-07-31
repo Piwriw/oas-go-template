@@ -11,6 +11,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/oas"
 )
 
+// TestUseRunsAdditionalMiddleware verifies custom middleware executes after the built-in chain.
 func TestUseRunsAdditionalMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -34,6 +35,7 @@ func TestUseRunsAdditionalMiddleware(t *testing.T) {
 	}
 }
 
+// TestUseAddsDeprecationHeadersFromOpenAPI verifies matched deprecated routes expose contract lifecycle dates.
 func TestUseAddsDeprecationHeadersFromOpenAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	spec := &openapi3.T{Paths: openapi3.NewPaths(

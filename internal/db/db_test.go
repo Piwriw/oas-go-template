@@ -8,9 +8,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// SQLite :memory: with cache=shared keeps a single in-memory DB across the
-// connection pool. Combined with MaxOpenConns=1, this avoids the "first query
-// creates the schema, second connection sees an empty DB" trap.
+// TestInit_sqlite_memory verifies shared in-memory SQLite initialization, migrations, and connectivity.
 func TestInit_sqlite_memory(t *testing.T) {
 	ctx := context.Background()
 
@@ -50,6 +48,7 @@ func TestInit_sqlite_memory(t *testing.T) {
 	}
 }
 
+// TestInit_disabledReturnsNil verifies an omitted database driver produces no connection or error.
 func TestInit_disabledReturnsNil(t *testing.T) {
 	gdb, err := Init(context.Background(), Config{})
 	if err != nil {
@@ -63,6 +62,7 @@ func TestInit_disabledReturnsNil(t *testing.T) {
 	}
 }
 
+// TestInit_unsupportedDriver verifies unknown database drivers fail before connection setup.
 func TestInit_unsupportedDriver(t *testing.T) {
 	_, err := Init(context.Background(), Config{
 		Driver: "oracle",
@@ -73,6 +73,7 @@ func TestInit_unsupportedDriver(t *testing.T) {
 	}
 }
 
+// TestInit_sqlite_badDSN verifies invalid SQLite connection targets fail initialization.
 func TestInit_sqlite_badDSN(t *testing.T) {
 	_, err := Init(context.Background(), Config{
 		Driver: "sqlite",
@@ -83,6 +84,7 @@ func TestInit_sqlite_badDSN(t *testing.T) {
 	}
 }
 
+// TestDisabled verifies only an empty driver marks database support as intentionally absent.
 func TestDisabled(t *testing.T) {
 	if !(Config{}).Disabled() {
 		t.Fatal("zero-value Config should be Disabled")
@@ -98,14 +100,24 @@ type recordingLogger struct {
 	traces int
 }
 
+// LogMode preserves the recording logger across Gorm severity changes.
 func (r *recordingLogger) LogMode(logger.LogLevel) logger.Interface { return r }
-func (r *recordingLogger) Info(context.Context, string, ...any)     {}
-func (r *recordingLogger) Warn(context.Context, string, ...any)     {}
-func (r *recordingLogger) Error(context.Context, string, ...any)    {}
+
+// Info ignores informational events that are irrelevant to SQL trace-gating assertions.
+func (r *recordingLogger) Info(context.Context, string, ...any) {}
+
+// Warn ignores warning events that are irrelevant to SQL trace-gating assertions.
+func (r *recordingLogger) Warn(context.Context, string, ...any) {}
+
+// Error ignores error events that are irrelevant to SQL trace-gating assertions.
+func (r *recordingLogger) Error(context.Context, string, ...any) {}
+
+// Trace counts SQL execution events forwarded by the logger under test.
 func (r *recordingLogger) Trace(context.Context, time.Time, func() (string, int64), error) {
 	r.traces++
 }
 
+// TestSQLToggleLogger_gatesTrace verifies successful SQL details follow the configured logging switch.
 func TestSQLToggleLogger_gatesTrace(t *testing.T) {
 	// log_sql=false → Trace calls are dropped before reaching inner.
 	inner := &recordingLogger{}
@@ -125,6 +137,7 @@ func TestSQLToggleLogger_gatesTrace(t *testing.T) {
 	}
 }
 
+// TestSQLToggleLogger_passesThroughInfoWarnError verifies non-trace database events always reach the base logger.
 func TestSQLToggleLogger_passesThroughInfoWarnError(_ *testing.T) {
 	// Non-Trace methods must always pass through, regardless of logSQL.
 	inner := &recordingLogger{}

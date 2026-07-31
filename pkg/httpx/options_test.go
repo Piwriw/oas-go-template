@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// TestOptions_ApplyAll verifies each client option mutates only its intended configuration field.
 func TestOptions_ApplyAll(t *testing.T) {
 	log := slog.Default()
 	rt := &http.Transport{}

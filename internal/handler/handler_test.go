@@ -15,12 +15,14 @@ import (
 // Compile-time assertion that Handler implements StrictServerInterface.
 var _ api.StrictServerInterface = (*Handler)(nil)
 
+// TestNewReturnsHandler verifies dependency construction produces a usable strict API handler.
 func TestNewReturnsHandler(t *testing.T) {
 	if New(nil) == nil {
 		t.Fatal("New(nil) returned nil")
 	}
 }
 
+// TestGetReadyWithoutDB verifies readiness succeeds when database support is intentionally disabled.
 func TestGetReadyWithoutDB(t *testing.T) {
 	response, err := New(nil).GetReady(context.Background(), api.GetReadyRequestObject{})
 	if err != nil {
@@ -36,6 +38,7 @@ func TestGetReadyWithoutDB(t *testing.T) {
 	}
 }
 
+// TestGetReadyFailsWhileDraining verifies graceful shutdown removes the server from ready traffic.
 func TestGetReadyFailsWhileDraining(t *testing.T) {
 	drainState := NewDrainState(0)
 	drainState.Begin()
@@ -55,6 +58,7 @@ func TestGetReadyFailsWhileDraining(t *testing.T) {
 	}
 }
 
+// TestGetReadySanitizesDatabaseError verifies dependency failures return stable readiness errors.
 func TestGetReadySanitizesDatabaseError(t *testing.T) {
 	gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {

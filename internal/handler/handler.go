@@ -12,9 +12,7 @@ type Handler struct {
 	drainState *DrainState
 }
 
-// New returns a Handler wired to the given dependencies. Pass nil for any
-// dependency that isn't available; affected endpoints degrade gracefully.
-// An optional DrainState makes readiness fail before graceful shutdown.
+// New wires API handlers to optional database and graceful-drain dependencies.
 func New(gdb *gorm.DB, drainStates ...*DrainState) *Handler {
 	drainState := NewDrainState()
 	if len(drainStates) > 0 && drainStates[0] != nil {
