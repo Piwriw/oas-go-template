@@ -1,4 +1,5 @@
-// Package db initializes a *gorm.DB with OTel tracing and connection pooling.
+// Package db initializes a *gorm.DB with OTel tracing, connection pooling, and
+// embedded SQL schema migrations.
 //
 // Driver is selected via Config.Driver (postgres|mysql|sqlite). When Driver is
 // empty, Init returns (nil, nil) so the server can boot without a database —
@@ -46,8 +47,9 @@ type Config struct {
 func (c Config) Disabled() bool { return c.Driver == "" }
 
 // Init opens a *gorm.DB for cfg.Driver, registers the OTel tracing plugin so
-// every SQL operation becomes a child span, and configures the connection pool.
-// Returns (nil, nil) when cfg.Disabled().
+// every SQL operation becomes a child span, configures the connection pool,
+// and applies pending schema migrations. Returns (nil, nil) when
+// cfg.Disabled().
 func Init(ctx context.Context, cfg Config) (*gorm.DB, error) {
 	if cfg.Disabled() {
 		return nil, nil
@@ -94,6 +96,9 @@ func Init(ctx context.Context, cfg Config) (*gorm.DB, error) {
 	defer cancel()
 	if err := sqlDB.PingContext(pingCtx); err != nil {
 		return nil, fmt.Errorf("db ping: %w", err)
+	}
+	if err := Migrate(ctx, gdb, cfg); err != nil {
+		return nil, fmt.Errorf("db migrate: %w", err)
 	}
 
 	slog.Info("db connected",

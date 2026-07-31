@@ -173,6 +173,22 @@ For sqlite tests use `file::memory:?cache=shared` plus `max_open_conns: 1`
 (see `internal/db/db_test.go`) — without that, each pool connection gets its
 own private memory DB.
 
+SQL migrations run automatically after the startup database ping. Add every
+schema change under `internal/db/migrations/` as a unique UTC timestamped pair:
+
+```text
+20260801143000_create_users.up.sql
+20260801143000_create_users.down.sql
+```
+
+The files are embedded into the server binary. `golang-migrate` applies pending
+`up` files in version order and stores the current version and dirty state in
+`schema_migrations`; later starts skip versions already applied. Never edit or
+reuse an applied version, and make each `down` file reverse its matching `up`
+file. Invalid timestamps, missing direction pairs, migration failures, and a
+dirty database all stop server startup instead of serving against an uncertain
+schema.
+
 ## Local Observability Stack
 
 `docker-compose.yml` boots an OpenTelemetry Collector + Jaeger all-in-one so you

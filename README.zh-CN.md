@@ -144,6 +144,20 @@ db:
 
 每条 SQL 操作都会通过 `gorm.io/plugin/opentelemetry` 成为 OTel span。sqlite 测试用 `file::memory:?cache=shared` 加 `max_open_conns: 1`（见 `internal/db/db_test.go`）——否则连接池里每个连接会拿到独立的内存数据库。
 
+服务启动时完成数据库 ping 后会自动执行 SQL 迁移。每次表结构变化都在
+`internal/db/migrations/` 下新增一对唯一的 UTC 时间版本文件：
+
+```text
+20260801143000_create_users.up.sql
+20260801143000_create_users.down.sql
+```
+
+这些 SQL 文件会嵌入服务端二进制。`golang-migrate` 按版本顺序执行未应用的
+`up` 文件，并把当前版本和 dirty 状态写入 `schema_migrations`；后续启动会跳过
+已执行版本。不要修改或复用已执行的版本，每个 `down` 文件必须撤销对应 `up`
+文件的变更。时间戳不合法、缺少 up/down 配对、迁移失败或数据库处于 dirty 状态
+都会阻止服务启动，避免服务运行在不确定的表结构上。
+
 ## 本地可观测性栈
 
 `docker-compose.yml` 启动一个 OpenTelemetry Collector + Jaeger all-in-one，让你无需任何云账号就能端到端验证 trace。

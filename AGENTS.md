@@ -112,6 +112,12 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 `internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout.
 
+After the ping, `Init` runs embedded SQL migrations from
+`internal/db/migrations/`. Each change is a
+`YYYYMMDDHHMMSS_name.up.sql` / `.down.sql` pair managed by `golang-migrate`.
+The current version and dirty state live in `schema_migrations`; applied
+versions are skipped. Never edit or reuse an applied version.
+
 `*gorm.DB` is injected via `handler.New(gdb)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
 
 For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — see `internal/db/db_test.go`. With a connection pool, each connection otherwise gets its own private memory DB.

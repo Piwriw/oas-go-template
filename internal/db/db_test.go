@@ -36,6 +36,9 @@ func TestInit_sqlite_memory(t *testing.T) {
 	if err := Ping(ctx, gdb); err != nil {
 		t.Fatalf("Ping after Init: %v", err)
 	}
+	if !gdb.Migrator().HasTable(migrationTableName) {
+		t.Fatal("Init did not create the schema migration table")
+	}
 
 	// Sanity: a real round-trip through gorm.
 	var got int
