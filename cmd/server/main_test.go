@@ -31,8 +31,8 @@ func testConfig() *config.Config {
 			ReadTimeout:       3 * time.Second,
 			WriteTimeout:      4 * time.Second,
 			IdleTimeout:       5 * time.Second,
-			MaxHeaderBytes:    2048,
-			MaxBodyBytes:      1024,
+			MaxHeaderMB:       1,
+			MaxBodyMB:         1,
 		},
 	}
 }
@@ -300,10 +300,10 @@ func TestRoutingErrorsUseAPIError(t *testing.T) {
 // TestRequestBodyLimitUsesAPIError verifies oversized payloads return the shared public error schema.
 func TestRequestBodyLimitUsesAPIError(t *testing.T) {
 	cfg := testConfig()
-	cfg.Server.MaxBodyBytes = 4
 	srv := newHTTPServer(cfg, nil)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/healthz", strings.NewReader("12345"))
+	payload := strings.Repeat("x", int(cfg.Server.MaxBodyBytes())+1)
+	req := httptest.NewRequest(http.MethodPost, "/healthz", strings.NewReader(payload))
 	srv.Handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
@@ -329,7 +329,7 @@ func TestHTTPServerProtectionConfig(t *testing.T) {
 	if srv.WriteTimeout != cfg.Server.WriteTimeout || srv.IdleTimeout != cfg.Server.IdleTimeout {
 		t.Errorf("write/idle timeouts = %v/%v", srv.WriteTimeout, srv.IdleTimeout)
 	}
-	if srv.MaxHeaderBytes != cfg.Server.MaxHeaderBytes {
+	if srv.MaxHeaderBytes != cfg.Server.MaxHeaderBytes() {
 		t.Errorf("MaxHeaderBytes = %d", srv.MaxHeaderBytes)
 	}
 }

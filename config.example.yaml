@@ -12,8 +12,8 @@ server:
   write_timeout: 30s         # set to 0 for streaming responses
   idle_timeout: 60s
   drain_timeout: 5s          # readiness stays 503 before graceful shutdown
-  max_header_bytes: 1048576  # 1 MiB
-  max_body_bytes: 1048576    # 1 MiB; 0 disables the application limit
+  max_header_mb: 1           # 1 MiB
+  max_body_mb: 1             # 1 MiB; 0 disables the application limit
 
 db:
   driver: ""                 # postgres | mysql | sqlite; empty = disabled

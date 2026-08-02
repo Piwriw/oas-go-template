@@ -106,7 +106,7 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB, drainStates ...*handler.Dra
 	r.HandleMethodNotAllowed = true
 	middleware.Use(r, middleware.Options{
 		ServiceName:  serviceName,
-		MaxBodyBytes: cfg.Server.MaxBodyBytes,
+		MaxBodyBytes: cfg.Server.MaxBodyBytes(),
 		CORS:         cfg.CORS,
 		OpenAPISpec:  swaggerSpec,
 	})
@@ -131,7 +131,7 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB, drainStates ...*handler.Dra
 		ReadTimeout:       cfg.Server.ReadTimeout,
 		WriteTimeout:      cfg.Server.WriteTimeout,
 		IdleTimeout:       cfg.Server.IdleTimeout,
-		MaxHeaderBytes:    cfg.Server.MaxHeaderBytes,
+		MaxHeaderBytes:    cfg.Server.MaxHeaderBytes(),
 	}
 }
 

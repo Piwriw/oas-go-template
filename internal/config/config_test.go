@@ -29,8 +29,8 @@ server:
   write_timeout: 40s
   idle_timeout: 90s
   drain_timeout: 7s
-  max_header_bytes: 2048
-  max_body_bytes: 4096
+  max_header_mb: 2
+  max_body_mb: 4
 db:
   driver: postgres
   dsn: "host=localhost dbname=app"
@@ -109,8 +109,8 @@ server:
   write_timeout: 40s
   idle_timeout: 90s
   drain_timeout: 7s
-  max_header_bytes: 2048
-  max_body_bytes: 4096
+  max_header_mb: 2
+  max_body_mb: 4
 `)
 	cfg, err := Load(p)
 	if err != nil {
@@ -125,8 +125,27 @@ server:
 	if cfg.Server.DrainTimeout != 7*time.Second {
 		t.Errorf("drain timeout = %v", cfg.Server.DrainTimeout)
 	}
-	if cfg.Server.MaxHeaderBytes != 2048 || cfg.Server.MaxBodyBytes != 4096 {
-		t.Errorf("request limits = %d/%d", cfg.Server.MaxHeaderBytes, cfg.Server.MaxBodyBytes)
+	if cfg.Server.MaxHeaderMB != 2 || cfg.Server.MaxBodyMB != 4 {
+		t.Errorf("request limits = %d/%d MB", cfg.Server.MaxHeaderMB, cfg.Server.MaxBodyMB)
+	}
+	if cfg.Server.MaxHeaderBytes() != 2<<20 || cfg.Server.MaxBodyBytes() != 4<<20 {
+		t.Errorf("request limits = %d/%d bytes", cfg.Server.MaxHeaderBytes(), cfg.Server.MaxBodyBytes())
+	}
+}
+
+// TestLoad_zeroBodyMBDisablesLimit verifies an explicit zero overrides the default request body limit.
+func TestLoad_zeroBodyMBDisablesLimit(t *testing.T) {
+	dir := t.TempDir()
+	p := writeFile(t, dir, `
+server:
+  max_body_mb: 0
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Server.MaxBodyMB != 0 || cfg.Server.MaxBodyBytes() != 0 {
+		t.Errorf("body limit = %d MB/%d bytes, want disabled", cfg.Server.MaxBodyMB, cfg.Server.MaxBodyBytes())
 	}
 }
 
@@ -150,8 +169,11 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	if cfg.Server.DrainTimeout != 5*time.Second {
 		t.Errorf("default drain timeout = %v", cfg.Server.DrainTimeout)
 	}
-	if cfg.Server.MaxHeaderBytes != 1<<20 || cfg.Server.MaxBodyBytes != 1<<20 {
-		t.Errorf("default request limits = %d/%d", cfg.Server.MaxHeaderBytes, cfg.Server.MaxBodyBytes)
+	if cfg.Server.MaxHeaderMB != 1 || cfg.Server.MaxBodyMB != 1 {
+		t.Errorf("default request limits = %d/%d MB", cfg.Server.MaxHeaderMB, cfg.Server.MaxBodyMB)
+	}
+	if cfg.Server.MaxHeaderBytes() != 1<<20 || cfg.Server.MaxBodyBytes() != 1<<20 {
+		t.Errorf("default request limits = %d/%d bytes", cfg.Server.MaxHeaderBytes(), cfg.Server.MaxBodyBytes())
 	}
 	if !cfg.OTel.Enabled {
 		t.Errorf("default OTel.Enabled should be true")
@@ -231,10 +253,10 @@ log:
 // TestLoad_rejectsNegativeServerProtectionValues verifies HTTP timeouts and limits cannot be negative.
 func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
 	tests := map[string]string{
-		"read timeout":     "read_timeout: -1s",
-		"drain timeout":    "drain_timeout: -1s",
-		"max header bytes": "max_header_bytes: -1",
-		"max body bytes":   "max_body_bytes: -1",
+		"read timeout":  "read_timeout: -1s",
+		"drain timeout": "drain_timeout: -1s",
+		"max header MB": "max_header_mb: -1",
+		"max body MB":   "max_body_mb: -1",
 	}
 	for name, field := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -295,7 +317,7 @@ server:
 	if cfg.Server.GinMode != "debug" {
 		t.Errorf("GinMode default dropped: got %q", cfg.Server.GinMode)
 	}
-	if cfg.Server.ReadHeaderTimeout != 5*time.Second || cfg.Server.MaxBodyBytes != 1<<20 {
+	if cfg.Server.ReadHeaderTimeout != 5*time.Second || cfg.Server.MaxBodyBytes() != 1<<20 {
 		t.Errorf("server protection defaults dropped: got %+v", cfg.Server)
 	}
 	if cfg.DB.MaxOpenConns != 25 {

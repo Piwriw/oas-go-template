@@ -78,7 +78,7 @@ built-in chain in this order:
 
 ```go
 middleware.Use(r, middleware.Options{
-    ServiceName: serviceName, MaxBodyBytes: cfg.Server.MaxBodyBytes,
+    ServiceName: serviceName, MaxBodyBytes: cfg.Server.MaxBodyBytes(),
     CORS: cfg.CORS, OpenAPISpec: spec,
 })
 ```

@@ -150,7 +150,7 @@ write timeout, 60s idle timeout, 5s graceful-drain window, 1 MiB headers, and
 1 MiB request bodies. On shutdown, `/readyz` returns 503 first, then the server
 waits for `drain_timeout` before closing listeners. Tune these under `server`
 in `config.yaml`; set `write_timeout: 0` for streaming responses and
-`max_body_bytes: 0` to disable the application body limit.
+`max_body_mb: 0` to disable the application body limit.
 
 ## Database (Gorm)
 

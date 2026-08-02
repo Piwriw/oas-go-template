@@ -55,7 +55,7 @@ Response type names come from the OAS status code + schema — **only use names 
 `cmd/server/main.go:newHTTPServer` wires the chain in this exact order:
 
 ```go
-r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(cfg.Server.MaxBodyBytes))
+r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(cfg.Server.MaxBodyBytes()))
 
 The generated API routes are registered on a separate group with the embedded
 OAS request validator. `/metrics` is intentionally registered outside that

@@ -24,6 +24,8 @@ import (
 	"github.com/piwriw/oas-go-template/internal/otel"
 )
 
+const bytesPerMB = 1 << 20
+
 // Config holds all runtime configuration for the server.
 type Config struct {
 	Server ServerConfig      `mapstructure:"server"`
@@ -54,8 +56,18 @@ type ServerConfig struct {
 	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
 	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
 	DrainTimeout      time.Duration `mapstructure:"drain_timeout"`
-	MaxHeaderBytes    int           `mapstructure:"max_header_bytes"`
-	MaxBodyBytes      int64         `mapstructure:"max_body_bytes"`
+	MaxHeaderMB       int           `mapstructure:"max_header_mb"`
+	MaxBodyMB         int64         `mapstructure:"max_body_mb"`
+}
+
+// MaxHeaderBytes converts the configured header limit from MB to bytes for net/http.
+func (cfg ServerConfig) MaxHeaderBytes() int {
+	return cfg.MaxHeaderMB * bytesPerMB
+}
+
+// MaxBodyBytes converts the configured request body limit from MB to bytes for middleware.
+func (cfg ServerConfig) MaxBodyBytes() int64 {
+	return cfg.MaxBodyMB * bytesPerMB
 }
 
 // Load merges a YAML file over server defaults and validates the resulting runtime configuration.
@@ -95,8 +107,8 @@ func defaults() Config {
 			WriteTimeout:      30 * time.Second,
 			IdleTimeout:       60 * time.Second,
 			DrainTimeout:      5 * time.Second,
-			MaxHeaderBytes:    1 << 20,
-			MaxBodyBytes:      1 << 20,
+			MaxHeaderMB:       1,
+			MaxBodyMB:         1,
 		},
 		DB: db.Config{
 			MaxOpenConns:    25,
@@ -138,11 +150,17 @@ func validate(cfg *Config) error {
 			return fmt.Errorf("%s must be non-negative", name)
 		}
 	}
-	if cfg.Server.MaxHeaderBytes < 0 {
-		return fmt.Errorf("server.max_header_bytes must be non-negative")
+	if cfg.Server.MaxHeaderMB < 0 {
+		return fmt.Errorf("server.max_header_mb must be non-negative")
 	}
-	if cfg.Server.MaxBodyBytes < 0 {
-		return fmt.Errorf("server.max_body_bytes must be non-negative")
+	if cfg.Server.MaxHeaderMB > int(^uint(0)>>1)/bytesPerMB {
+		return fmt.Errorf("server.max_header_mb is too large")
+	}
+	if cfg.Server.MaxBodyMB < 0 {
+		return fmt.Errorf("server.max_body_mb must be non-negative")
+	}
+	if cfg.Server.MaxBodyMB > int64(^uint64(0)>>1)/bytesPerMB {
+		return fmt.Errorf("server.max_body_mb is too large")
 	}
 	if err := validateCORS(cfg.CORS); err != nil {
 		return err
