@@ -1,9 +1,8 @@
-// Package oas contains checks and runtime helpers for the OpenAPI contract.
+// Package oas validates repository policy for the OpenAPI contract.
 package oas
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"sort"
 	"strings"
@@ -19,8 +18,6 @@ const (
 	DeprecationDateExtension = "x-deprecation-date"
 	SunsetDateExtension      = "x-sunset-date"
 	URLPrefixStrategy        = "url-prefix"
-	deprecationHeader        = "Deprecation"
-	sunsetHeader             = "Sunset"
 )
 
 var (
@@ -170,45 +167,4 @@ func timeExtension(extensions map[string]any, name string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("%s must be an RFC3339 timestamp: %w", name, err)
 	}
 	return parsed, nil
-}
-
-// FindOperation resolves a Gin route template to an OpenAPI operation.
-func FindOperation(doc *openapi3.T, ginPath, method string) *openapi3.Operation {
-	if doc == nil || doc.Paths == nil {
-		return nil
-	}
-	item := doc.Paths.Find(ginPathToOASPath(ginPath))
-	if item == nil {
-		return nil
-	}
-	return item.Operations()[strings.ToUpper(method)]
-}
-
-// ApplyDeprecationHeaders exposes contract lifecycle dates for a deprecated matched operation.
-func ApplyDeprecationHeaders(c interface{ Header(string, string) }, op *openapi3.Operation) {
-	if op == nil || !op.Deprecated {
-		return
-	}
-	if deprecatedAt, err := timeExtension(op.Extensions, DeprecationDateExtension); err == nil {
-		c.Header(deprecationHeader, deprecatedAt.Format(time.RFC3339))
-	}
-	if sunsetAt, err := timeExtension(op.Extensions, SunsetDateExtension); err == nil {
-		c.Header(sunsetHeader, sunsetAt.Format(time.RFC3339))
-	}
-}
-
-// ginPathToOASPath converts Gin colon parameters to OpenAPI brace parameters for route lookup.
-func ginPathToOASPath(path string) string {
-	parts := strings.Split(path, "/")
-	for i, part := range parts {
-		if strings.HasPrefix(part, ":") || strings.HasPrefix(part, "*") {
-			parts[i] = "{" + part[1:] + "}"
-		}
-	}
-	return strings.Join(parts, "/")
-}
-
-// DeprecatedHeaderNames returns the lifecycle response headers clients may need exposed through CORS.
-func DeprecatedHeaderNames() []string {
-	return []string{http.CanonicalHeaderKey(deprecationHeader), http.CanonicalHeaderKey(sunsetHeader)}
 }

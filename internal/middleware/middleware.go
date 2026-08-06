@@ -2,7 +2,6 @@
 package middleware
 
 import (
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -10,7 +9,6 @@ import (
 	"github.com/piwriw/oas-go-template/internal/config"
 	"github.com/piwriw/oas-go-template/internal/handler"
 	"github.com/piwriw/oas-go-template/internal/logging"
-	"github.com/piwriw/oas-go-template/internal/oas"
 )
 
 // Options configures the global middleware chain.
@@ -18,7 +16,6 @@ type Options struct {
 	ServiceName  string
 	MaxBodyBytes int64
 	CORS         config.CORSConfig
-	OpenAPISpec  *openapi3.T
 }
 
 // Handlers returns the middleware chain in its required order.
@@ -32,19 +29,7 @@ func Handlers(opts Options, additional ...gin.HandlerFunc) []gin.HandlerFunc {
 		handlers = append(handlers, corsHandler(opts.CORS))
 	}
 	handlers = append(handlers, handler.BodyLimit(opts.MaxBodyBytes))
-	if opts.OpenAPISpec != nil {
-		handlers = append(handlers, deprecation(opts.OpenAPISpec))
-	}
 	return append(handlers, additional...)
-}
-
-// deprecation emits lifecycle headers declared by the matched deprecated OpenAPI operation.
-func deprecation(spec *openapi3.T) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		op := oas.FindOperation(spec, c.FullPath(), c.Request.Method)
-		oas.ApplyDeprecationHeaders(c, op)
-		c.Next()
-	}
 }
 
 // corsHandler translates validated cross-origin configuration into Gin middleware.

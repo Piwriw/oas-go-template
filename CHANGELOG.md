@@ -24,8 +24,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - `make tools` for installing pinned versions of the development tools.
 - URL-prefix API versioning policy for business endpoints, with unversioned
   operational probe exceptions documented in the OpenAPI contract.
-- OpenAPI deprecation metadata validation and runtime `Deprecation` / `Sunset`
-  response headers for deprecated operations.
+- OpenAPI deprecation metadata validation for deprecated operations.
 - A pinned `oasdiff` compatibility check via `make contract-check`, enforced on
   pull requests against the target branch's OpenAPI contract.
 - A single Go 1.26.5 toolchain across `go.mod`, local checks, CI, and the

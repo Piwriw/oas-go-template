@@ -55,10 +55,8 @@ use a `/vN/` prefix. `internal/oas` validates this policy at startup.
 
 For a deprecated operation, set `deprecated: true` and provide RFC3339
 `x-deprecation-date` and `x-sunset-date` extensions. The sunset must be later
-than the deprecation date. The global middleware resolves the matched Gin route
-against the embedded OAS operation and emits `Deprecation` and `Sunset`
-response headers. Keep the operation available until sunset; removing it
-earlier is a breaking contract change.
+than the deprecation date. Keep the operation available until sunset; removing
+it earlier is a breaking contract change.
 
 `make contract-check BASE_SPEC=/path/to/openapi-base.yaml` runs pinned
 `oasdiff` v1.10.28. Pull request CI supplies the target branch's spec as the
@@ -79,12 +77,12 @@ built-in chain in this order:
 ```go
 middleware.Use(r, middleware.Options{
     ServiceName: serviceName, MaxBodyBytes: cfg.Server.MaxBodyBytes(),
-    CORS: cfg.CORS, OpenAPISpec: spec,
+    CORS: cfg.CORS,
 })
 ```
 
-That expands to recovery, OTel, logging, optional CORS, body limit, and
-optional OAS deprecation headers in that order.
+That expands to recovery, OTel, logging, optional CORS, and body limit in that
+order.
 
 Generated API routes add the embedded OAS request validator and use
 `handler.StrictServerOptions()` for the common `api.Error` response. The

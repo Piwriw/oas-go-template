@@ -103,7 +103,6 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 		ServiceName:  serviceName,
 		MaxBodyBytes: cfg.Server.MaxBodyBytes(),
 		CORS:         cfg.CORS,
-		OpenAPISpec:  swaggerSpec,
 	})
 	r.NoRoute(handler.NoRoute)
 	r.NoMethod(handler.NoMethod)

@@ -1,7 +1,6 @@
 package oas
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -53,39 +52,6 @@ func TestValidateDeprecationMetadata(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestFindOperationAndApplyDeprecationHeaders verifies Gin routes resolve to operations and emit lifecycle headers.
-func TestFindOperationAndApplyDeprecationHeaders(t *testing.T) {
-	doc := testDocument()
-	op := FindOperation(doc, "/v1/orders/:orderID", http.MethodGet)
-	if op == nil {
-		t.Fatal("FindOperation() returned nil")
-	}
-	op.Deprecated = true
-	op.Extensions = map[string]any{
-		DeprecationDateExtension: "2026-08-01T00:00:00Z",
-		SunsetDateExtension:      "2027-02-01T00:00:00Z",
-	}
-
-	headers := headerCapture{}
-	ApplyDeprecationHeaders(headers, op)
-	if got := headers[DeprecationDateExtension]; got != "" {
-		t.Fatalf("unexpected extension key in headers: %q", got)
-	}
-	if got := headers["Deprecation"]; got != "2026-08-01T00:00:00Z" {
-		t.Errorf("Deprecation header = %q", got)
-	}
-	if got := headers["Sunset"]; got != "2027-02-01T00:00:00Z" {
-		t.Errorf("Sunset header = %q", got)
-	}
-}
-
-type headerCapture map[string]string
-
-// Header captures emitted response metadata for deprecation assertions.
-func (h headerCapture) Header(name, value string) {
-	h[name] = value
 }
 
 // testDocument builds a minimal versioned OpenAPI contract for policy tests.

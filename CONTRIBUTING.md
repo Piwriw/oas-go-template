@@ -51,8 +51,7 @@ then regenerate and review all generated output in the same change.
   probe contracts. Put every new business path under `/vN/`.
 - For a deprecated operation, set `deprecated: true`,
   `x-deprecation-date`, and `x-sunset-date` to RFC3339 timestamps. The sunset
-  must be later than the deprecation date. Runtime middleware emits matching
-  `Deprecation` and `Sunset` response headers.
+  must be later than the deprecation date.
 - Do not remove or make an existing operation stricter without either adding a
   new `/vN` contract or documenting an approved migration. PR CI runs the
   pinned `oasdiff` check against the target branch's OpenAPI document.

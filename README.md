@@ -273,11 +273,9 @@ x-deprecation-date: "2026-08-01T00:00:00Z"
 x-sunset-date: "2027-02-01T00:00:00Z"
 ```
 
-The server validates that the sunset is later than the deprecation date and
-adds matching `Deprecation` and `Sunset` response headers. Keep the operation
-available until its sunset date; removing it earlier is a breaking change.
-When CORS is enabled, add these names to `cors.expose_headers` if browser
-clients need to read them.
+The server validates that the sunset is later than the deprecation date. Keep
+the operation available until its sunset date; removing it earlier is a
+breaking change.
 
 For a local compatibility check, compare the current contract with a known
 baseline:

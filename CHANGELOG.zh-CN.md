@@ -19,7 +19,7 @@
 - 可扩展的全局 Gin middleware 链，并提供明确的自定义 middleware 扩展入口。
 - `make tools` 命令，用于安装固定版本的开发工具。
 - 面向业务接口的 URL 前缀 API 版本化策略；OpenAPI 契约明确列出保持不带版本的运维探针。
-- 弃用接口的 OpenAPI 元数据校验，以及运行时 `Deprecation` / `Sunset` 响应头。
+- 弃用接口的 OpenAPI 元数据校验。
 - 固定 `oasdiff` 版本的 `make contract-check` 契约兼容性检查，并在 pull request 中与目标分支契约比较。
 - 在 `go.mod`、本地检查、CI 和后端 builder 镜像之间统一使用 Go 1.26.5。
 - 使用明确版本的 Docker 基础镜像 tag，并固定 GitHub Actions 的不可变引用；新增 `make supply-chain-check` 检测漂移。
