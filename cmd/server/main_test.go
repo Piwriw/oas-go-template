@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,10 +16,9 @@ import (
 	internalapi "github.com/piwriw/oas-go-template/internal/api"
 	"github.com/piwriw/oas-go-template/internal/config"
 	"github.com/piwriw/oas-go-template/internal/errcode"
-	"github.com/piwriw/oas-go-template/internal/handler"
 )
 
-// testConfig returns isolated server defaults with telemetry and draining disabled.
+// testConfig returns isolated server defaults with telemetry disabled.
 func testConfig() *config.Config {
 	return &config.Config{
 		Server: config.ServerConfig{
@@ -37,18 +34,14 @@ func testConfig() *config.Config {
 	}
 }
 
-// TestServeAndWaitMarksReadinessDrainingBeforeShutdown verifies shutdown removes readiness before closing HTTP service.
-func TestServeAndWaitMarksReadinessDrainingBeforeShutdown(t *testing.T) {
+// TestServeAndWaitShutsDownOnContextCancellation verifies cancellation gracefully stops the HTTP service.
+func TestServeAndWaitShutsDownOnContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	drainState := handler.NewDrainState(0)
 	srv := &http.Server{Addr: "127.0.0.1:0"}
 
-	if err := serveAndWait(ctx, srv, drainState); err != nil {
+	if err := serveAndWait(ctx, srv); err != nil {
 		t.Fatalf("serveAndWait() error = %v", err)
-	}
-	if !drainState.Draining() {
-		t.Fatal("serveAndWait() did not mark readiness as draining")
 	}
 }
 
@@ -57,19 +50,9 @@ func TestServeAndWaitListenErrorTakesPriorityOverCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	wantErr := errors.New("listen failed")
-	drainState := handler.NewDrainState(time.Hour)
-	srv := &http.Server{Addr: "127.0.0.1:8000"}
-	listen := func(_, _ string) (net.Listener, error) {
-		return nil, wantErr
-	}
-
-	err := serveAndWaitWithListener(ctx, srv, listen, drainState)
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("serveAndWaitWithListener() error = %v, want %v", err, wantErr)
-	}
-	if drainState.Draining() {
-		t.Fatal("listen failure incorrectly entered the signal drain path")
+	srv := &http.Server{Addr: "127.0.0.1:not-a-port"}
+	if err := serveAndWait(ctx, srv); err == nil {
+		t.Fatal("serveAndWait() error = nil, want listen error")
 	}
 }
 
@@ -104,27 +87,6 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
-	}
-}
-
-// TestReadinessReturns503WhileDraining verifies the readiness route rejects traffic during shutdown drain.
-func TestReadinessReturns503WhileDraining(t *testing.T) {
-	drainState := handler.NewDrainState(0)
-	srv := newHTTPServer(testConfig(), nil, drainState)
-	drainState.Begin()
-
-	rec := httptest.NewRecorder()
-	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
-
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
-	}
-	var body internalapi.Error
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode readiness error: %v", err)
-	}
-	if body.Code != int32(errcode.ServiceDraining) || body.Message != "service is shutting down" {
-		t.Errorf("body=%+v", body)
 	}
 }
 

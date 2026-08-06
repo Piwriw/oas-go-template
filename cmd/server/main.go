@@ -87,18 +87,13 @@ func run(configPath string) error {
 		shutdownOTel(otelShutdown)
 	}()
 
-	drainState := handler.NewDrainState(cfg.Server.DrainTimeout)
-	srv := newHTTPServer(cfg, gdb, drainState)
-	return serveAndWait(ctx, srv, drainState)
+	srv := newHTTPServer(cfg, gdb)
+	return serveAndWait(ctx, srv)
 }
 
 // newHTTPServer wires protected API and metrics routes from the embedded contract and runtime dependencies.
-func newHTTPServer(cfg *config.Config, gdb *gorm.DB, drainStates ...*handler.DrainState) *http.Server {
-	drainState := handler.NewDrainState(cfg.Server.DrainTimeout)
-	if len(drainStates) > 0 && drainStates[0] != nil {
-		drainState = drainStates[0]
-	}
-	h := handler.New(gdb, drainState)
+func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
+	h := handler.New(gdb)
 	strictHandler := internalapi.NewStrictHandlerWithOptions(h, nil, handler.StrictServerOptions())
 	swaggerSpec := openAPISpec()
 
@@ -157,26 +152,12 @@ func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
 }
 
 // serveAndWait opens the configured listener and coordinates graceful shutdown.
-func serveAndWait(ctx context.Context, srv *http.Server, drainStates ...*handler.DrainState) error {
-	return serveAndWaitWithListener(ctx, srv, net.Listen, drainStates...)
-}
-
-// serveAndWaitWithListener serves through an injectable listener and drains readiness before shutdown.
-func serveAndWaitWithListener(
-	ctx context.Context,
-	srv *http.Server,
-	listen func(network, address string) (net.Listener, error),
-	drainStates ...*handler.DrainState,
-) error {
-	var drainState *handler.DrainState
-	if len(drainStates) > 0 {
-		drainState = drainStates[0]
-	}
+func serveAndWait(ctx context.Context, srv *http.Server) error {
 	addr := srv.Addr
 	if addr == "" {
 		addr = ":http"
 	}
-	listener, err := listen("tcp", addr)
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		slog.Error("server listen failed", "addr", addr, "err", err)
 		return err
@@ -190,13 +171,7 @@ func serveAndWaitWithListener(
 
 	select {
 	case <-ctx.Done():
-		slog.Info("shutdown signal received, draining...")
-		if drainState != nil {
-			drainState.Begin()
-			if timeout := drainState.Timeout(); timeout > 0 {
-				time.Sleep(timeout)
-			}
-		}
+		slog.Info("shutdown signal received")
 	case serveErr := <-serverErr:
 		if serveErr == nil || errors.Is(serveErr, http.ErrServerClosed) {
 			return nil

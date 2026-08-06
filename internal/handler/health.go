@@ -20,12 +20,6 @@ func (h *Handler) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (ap
 
 // GetReady reports whether the server is accepting traffic and configured dependencies are reachable.
 func (h *Handler) GetReady(ctx context.Context, _ api.GetReadyRequestObject) (api.GetReadyResponseObject, error) {
-	if h.drainState != nil && h.drainState.Draining() {
-		return api.GetReady503JSONResponse(api.Error{
-			Code:    int32(errcode.ServiceDraining),
-			Message: "service is shutting down",
-		}), nil
-	}
 	if h.db == nil {
 		return api.GetReady200JSONResponse(api.Health{
 			Status: "ok",

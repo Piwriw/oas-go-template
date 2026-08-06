@@ -96,10 +96,10 @@ Two separate probes in `internal/handler/health.go`:
 - `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
 - `GET /readyz` — **readiness**. 200 when all configured deps are reachable; a disabled DB is skipped, while a configured DB ping failure returns 503. Don't add expensive checks to `/healthz`.
 
-During graceful shutdown, `handler.DrainState` flips readiness to 503 before
-`http.Server.Shutdown` begins. `server.drain_timeout` defaults to 5s so load
-balancers can observe the state change; keep the Helm
-`terminationGracePeriodSeconds` longer than that window.
+Graceful shutdown calls `http.Server.Shutdown` with a 10s deadline. It closes
+listeners immediately and waits for in-flight requests; readiness has no
+separate shutdown state or drain delay. Keep the Helm
+`terminationGracePeriodSeconds` longer than the shutdown deadline.
 
 ### /metrics
 

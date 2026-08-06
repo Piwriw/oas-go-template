@@ -11,7 +11,6 @@ server:
   read_timeout: 15s
   write_timeout: 30s         # set to 0 for streaming responses
   idle_timeout: 60s
-  drain_timeout: 5s          # readiness stays 503 before graceful shutdown
   max_header_mb: 1           # 1 MiB
   max_body_mb: 1             # 1 MiB; 0 disables the application limit
 

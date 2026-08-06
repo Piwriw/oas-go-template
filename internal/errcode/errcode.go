@@ -54,8 +54,8 @@ const Internal Code = 99001
 const (
 	// Deprecated: an intentionally disabled database is not a readiness error.
 	// Keep this value reserved because public error codes must never be reused.
-	DBUnavailable   Code = 50001
-	DBHandle        Code = 50002 // (*gorm.DB).DB() returned a non-nil error
-	DBPing          Code = 50003 // (*sql.DB).PingContext failed
-	ServiceDraining Code = 50004 // readiness is failing during graceful shutdown
+	DBUnavailable Code = 50001
+	DBHandle      Code = 50002 // (*gorm.DB).DB() returned a non-nil error
+	DBPing        Code = 50003 // (*sql.DB).PingContext failed
+	// Code 50004 is retired and must not be reused.
 )

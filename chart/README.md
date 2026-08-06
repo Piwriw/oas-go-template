@@ -55,7 +55,6 @@ server:
       read_timeout: 15s
       write_timeout: 30s
       idle_timeout: 60s
-      drain_timeout: 5s
       max_header_mb: 1
       max_body_mb: 1
     db:
@@ -95,10 +94,9 @@ the server ConfigMap. The Secret must exist in the release namespace. A change
 to the Secret name or key rolls the Deployment; after a content-only update,
 restart the Deployment or use a reloader controller.
 
-When a pod receives SIGTERM, the server marks `/readyz` unavailable, waits for
-`server.config.server.drain_timeout` (5s by default), and then closes its HTTP
-listener. Keep `server.terminationGracePeriodSeconds` longer than this drain
-window plus the shutdown timeout.
+When a pod receives SIGTERM, the server closes its HTTP listener and gives
+in-flight requests up to 10s to finish through `http.Server.Shutdown`. Keep
+`server.terminationGracePeriodSeconds` longer than this shutdown deadline.
 
 ## Switching OTel on
 

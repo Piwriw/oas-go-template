@@ -55,7 +55,6 @@ type ServerConfig struct {
 	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
 	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
-	DrainTimeout      time.Duration `mapstructure:"drain_timeout"`
 	MaxHeaderMB       int           `mapstructure:"max_header_mb"`
 	MaxBodyMB         int64         `mapstructure:"max_body_mb"`
 }
@@ -106,7 +105,6 @@ func defaults() Config {
 			ReadTimeout:       15 * time.Second,
 			WriteTimeout:      30 * time.Second,
 			IdleTimeout:       60 * time.Second,
-			DrainTimeout:      5 * time.Second,
 			MaxHeaderMB:       1,
 			MaxBodyMB:         1,
 		},
@@ -144,7 +142,6 @@ func validate(cfg *Config) error {
 		"server.read_timeout":        cfg.Server.ReadTimeout,
 		"server.write_timeout":       cfg.Server.WriteTimeout,
 		"server.idle_timeout":        cfg.Server.IdleTimeout,
-		"server.drain_timeout":       cfg.Server.DrainTimeout,
 	} {
 		if value < 0 {
 			return fmt.Errorf("%s must be non-negative", name)

@@ -23,7 +23,6 @@
 - 固定 `oasdiff` 版本的 `make contract-check` 契约兼容性检查，并在 pull request 中与目标分支契约比较。
 - 在 `go.mod`、本地检查、CI 和后端 builder 镜像之间统一使用 Go 1.26.5。
 - 使用明确版本的 Docker 基础镜像 tag，并固定 GitHub Actions 的不可变引用；新增 `make supply-chain-check` 检测漂移。
-- Kubernetes 优雅摘流：服务关闭时先让 readiness 返回 503，等待配置的摘流窗口后再关闭监听器。
 
 ### 变更
 
@@ -32,7 +31,7 @@
 - 结构化错误日志：内部错误详情和 panic 堆栈只记录在日志中，不返回给外部调用方。
 - CI 不再执行可变 tag 的 Helm 安装脚本，改为使用 SHA 固定的 `setup-helm` action。
 - 服务启动时会拒绝不符合版本化规则的路径，以及缺少或包含无效下线日期的弃用接口。
-- Helm 部署新增 `terminationGracePeriodSeconds`，为摘流窗口预留时间。
+- Helm 部署新增 `terminationGracePeriodSeconds`，为有界优雅停机预留时间。
 
 ### 修复
 

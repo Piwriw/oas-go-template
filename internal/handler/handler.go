@@ -8,15 +8,10 @@ import "gorm.io/gorm"
 // db may be nil when the server boots without a configured database. Because
 // the dependency is intentionally disabled, /readyz still reports ready.
 type Handler struct {
-	db         *gorm.DB
-	drainState *DrainState
+	db *gorm.DB
 }
 
-// New wires API handlers to optional database and graceful-drain dependencies.
-func New(gdb *gorm.DB, drainStates ...*DrainState) *Handler {
-	drainState := NewDrainState()
-	if len(drainStates) > 0 && drainStates[0] != nil {
-		drainState = drainStates[0]
-	}
-	return &Handler{db: gdb, drainState: drainState}
+// New wires API handlers to the optional database dependency.
+func New(gdb *gorm.DB) *Handler {
+	return &Handler{db: gdb}
 }

@@ -32,8 +32,6 @@ and versions follow [Semantic Versioning](https://semver.org/).
   backend builder image.
 - Explicitly versioned Docker base-image tags and immutable GitHub Actions
   references, plus `make supply-chain-check` to detect pin drift.
-- Graceful Kubernetes shutdown: readiness switches to 503 before the server
-  waits for the configured drain window and closes listeners.
 
 ### Changed
 
@@ -47,8 +45,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
   remote installer script.
 - Server startup now rejects paths that violate the API versioning policy or
   deprecated operations with incomplete/invalid sunset metadata.
-- Helm deployments now expose `terminationGracePeriodSeconds` for the drain
-  window.
+- Helm deployments now expose `terminationGracePeriodSeconds` for bounded
+  graceful shutdown.
 
 ### Fixed
 

@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/piwriw/oas-go-template/internal/api"
-	"github.com/piwriw/oas-go-template/internal/errcode"
 )
 
 // Compile-time assertion that Handler implements StrictServerInterface.
@@ -35,26 +34,6 @@ func TestGetReadyWithoutDB(t *testing.T) {
 	}
 	if ready.Status != "ok" {
 		t.Errorf("GetReady() status = %q, want ok", ready.Status)
-	}
-}
-
-// TestGetReadyFailsWhileDraining verifies graceful shutdown removes the server from ready traffic.
-func TestGetReadyFailsWhileDraining(t *testing.T) {
-	drainState := NewDrainState(0)
-	drainState.Begin()
-	response, err := New(nil, drainState).GetReady(context.Background(), api.GetReadyRequestObject{})
-	if err != nil {
-		t.Fatalf("GetReady() error = %v", err)
-	}
-	ready, ok := response.(api.GetReady503JSONResponse)
-	if !ok {
-		t.Fatalf("GetReady() response type = %T, want api.GetReady503JSONResponse", response)
-	}
-	if ready.Code != int32(errcode.ServiceDraining) {
-		t.Errorf("GetReady() code = %d, want %d", ready.Code, errcode.ServiceDraining)
-	}
-	if ready.Message != "service is shutting down" {
-		t.Errorf("GetReady() message = %q", ready.Message)
 	}
 }
 
