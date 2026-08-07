@@ -24,12 +24,6 @@ func TestLoad_fullYAML(t *testing.T) {
 server:
   http_addr: ":9999"
   gin_mode: release
-  read_header_timeout: 2s
-  read_timeout: 20s
-  write_timeout: 40s
-  idle_timeout: 90s
-  max_header_mb: 2
-  max_body_mb: 4
 db:
   driver: postgres
   dsn: "host=localhost dbname=app"
@@ -98,52 +92,6 @@ cors:
 	}
 }
 
-// TestLoad_serverProtectionYAML verifies HTTP resource limits and timeouts decode from YAML.
-func TestLoad_serverProtectionYAML(t *testing.T) {
-	dir := t.TempDir()
-	p := writeFile(t, dir, `
-server:
-  read_header_timeout: 2s
-  read_timeout: 20s
-  write_timeout: 40s
-  idle_timeout: 90s
-  max_header_mb: 2
-  max_body_mb: 4
-`)
-	cfg, err := Load(p)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if cfg.Server.ReadHeaderTimeout != 2*time.Second || cfg.Server.ReadTimeout != 20*time.Second {
-		t.Errorf("read timeouts = %v/%v", cfg.Server.ReadHeaderTimeout, cfg.Server.ReadTimeout)
-	}
-	if cfg.Server.WriteTimeout != 40*time.Second || cfg.Server.IdleTimeout != 90*time.Second {
-		t.Errorf("write/idle timeouts = %v/%v", cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
-	}
-	if cfg.Server.MaxHeaderMB != 2 || cfg.Server.MaxBodyMB != 4 {
-		t.Errorf("request limits = %d/%d MB", cfg.Server.MaxHeaderMB, cfg.Server.MaxBodyMB)
-	}
-	if cfg.Server.MaxHeaderBytes() != 2<<20 || cfg.Server.MaxBodyBytes() != 4<<20 {
-		t.Errorf("request limits = %d/%d bytes", cfg.Server.MaxHeaderBytes(), cfg.Server.MaxBodyBytes())
-	}
-}
-
-// TestLoad_zeroBodyMBDisablesLimit verifies an explicit zero overrides the default request body limit.
-func TestLoad_zeroBodyMBDisablesLimit(t *testing.T) {
-	dir := t.TempDir()
-	p := writeFile(t, dir, `
-server:
-  max_body_mb: 0
-`)
-	cfg, err := Load(p)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if cfg.Server.MaxBodyMB != 0 || cfg.Server.MaxBodyBytes() != 0 {
-		t.Errorf("body limit = %d MB/%d bytes, want disabled", cfg.Server.MaxBodyMB, cfg.Server.MaxBodyBytes())
-	}
-}
-
 // TestLoad_missingFileFallsBackToDefaults verifies absent explicit configuration retains operational defaults.
 func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	// Any path that doesn't exist → no error, defaults returned so dev/test
@@ -154,18 +102,6 @@ func TestLoad_missingFileFallsBackToDefaults(t *testing.T) {
 	}
 	if cfg.Server.HTTPAddr != ":8000" {
 		t.Errorf("default HTTPAddr = %q, want :8000", cfg.Server.HTTPAddr)
-	}
-	if cfg.Server.ReadHeaderTimeout != 5*time.Second || cfg.Server.ReadTimeout != 15*time.Second {
-		t.Errorf("default read timeouts = %v/%v", cfg.Server.ReadHeaderTimeout, cfg.Server.ReadTimeout)
-	}
-	if cfg.Server.WriteTimeout != 30*time.Second || cfg.Server.IdleTimeout != 60*time.Second {
-		t.Errorf("default write/idle timeouts = %v/%v", cfg.Server.WriteTimeout, cfg.Server.IdleTimeout)
-	}
-	if cfg.Server.MaxHeaderMB != 1 || cfg.Server.MaxBodyMB != 1 {
-		t.Errorf("default request limits = %d/%d MB", cfg.Server.MaxHeaderMB, cfg.Server.MaxBodyMB)
-	}
-	if cfg.Server.MaxHeaderBytes() != 1<<20 || cfg.Server.MaxBodyBytes() != 1<<20 {
-		t.Errorf("default request limits = %d/%d bytes", cfg.Server.MaxHeaderBytes(), cfg.Server.MaxBodyBytes())
 	}
 	if !cfg.OTel.Enabled {
 		t.Errorf("default OTel.Enabled should be true")
@@ -242,24 +178,6 @@ log:
 	}
 }
 
-// TestLoad_rejectsNegativeServerProtectionValues verifies HTTP timeouts and limits cannot be negative.
-func TestLoad_rejectsNegativeServerProtectionValues(t *testing.T) {
-	tests := map[string]string{
-		"read timeout":  "read_timeout: -1s",
-		"max header MB": "max_header_mb: -1",
-		"max body MB":   "max_body_mb: -1",
-	}
-	for name, field := range tests {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			p := writeFile(t, dir, "server:\n  "+field+"\n")
-			if _, err := Load(p); err == nil {
-				t.Fatal("expected validation error")
-			}
-		})
-	}
-}
-
 // TestLoad_rejectsInvalidCORSConfig verifies unsafe or incomplete cross-origin policies are rejected.
 func TestLoad_rejectsInvalidCORSConfig(t *testing.T) {
 	tests := map[string]string{
@@ -307,9 +225,6 @@ server:
 	}
 	if cfg.Server.GinMode != "debug" {
 		t.Errorf("GinMode default dropped: got %q", cfg.Server.GinMode)
-	}
-	if cfg.Server.ReadHeaderTimeout != 5*time.Second || cfg.Server.MaxBodyBytes() != 1<<20 {
-		t.Errorf("server protection defaults dropped: got %+v", cfg.Server)
 	}
 	if cfg.DB.MaxOpenConns != 25 {
 		t.Errorf("DB.MaxOpenConns default dropped: got %d", cfg.DB.MaxOpenConns)

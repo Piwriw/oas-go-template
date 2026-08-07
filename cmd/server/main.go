@@ -33,7 +33,16 @@ import (
 	specapi "github.com/piwriw/oas-go-template/pkg/api"
 )
 
-const serviceName = "oas-go-template"
+const (
+	serviceName             = "oas-go-template"
+	serverReadHeaderTimeout = 5 * time.Second
+	serverReadTimeout       = 15 * time.Second
+	serverWriteTimeout      = 30 * time.Second
+	serverIdleTimeout       = 60 * time.Second
+	maxRequestHeaderBytes   = 1 << 20
+	maxRequestBodyBytes     = int64(1 << 20)
+	shutdownTimeout         = 10 * time.Second
+)
 
 // main parses server flags and exits nonzero when startup or serving fails.
 func main() {
@@ -101,7 +110,7 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	r.HandleMethodNotAllowed = true
 	middleware.Use(r, middleware.Options{
 		ServiceName:  serviceName,
-		MaxBodyBytes: cfg.Server.MaxBodyBytes(),
+		MaxBodyBytes: maxRequestBodyBytes,
 		CORS:         cfg.CORS,
 	})
 	r.NoRoute(handler.NoRoute)
@@ -121,11 +130,11 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	return &http.Server{
 		Addr:              cfg.Server.HTTPAddr,
 		Handler:           r,
-		ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout,
-		ReadTimeout:       cfg.Server.ReadTimeout,
-		WriteTimeout:      cfg.Server.WriteTimeout,
-		IdleTimeout:       cfg.Server.IdleTimeout,
-		MaxHeaderBytes:    cfg.Server.MaxHeaderBytes(),
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		ReadTimeout:       serverReadTimeout,
+		WriteTimeout:      serverWriteTimeout,
+		IdleTimeout:       serverIdleTimeout,
+		MaxHeaderBytes:    maxRequestHeaderBytes,
 	}
 }
 
@@ -179,7 +188,7 @@ func serveAndWait(ctx context.Context, srv *http.Server) error {
 		return serveErr
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("http shutdown error", "err", err)
@@ -198,7 +207,7 @@ func shutdownOTel(shutdown func(context.Context) error) {
 	if shutdown == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := shutdown(ctx); err != nil {
 		slog.Error("otel shutdown error", "err", err)

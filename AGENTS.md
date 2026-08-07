@@ -76,13 +76,16 @@ built-in chain in this order:
 
 ```go
 middleware.Use(r, middleware.Options{
-    ServiceName: serviceName, MaxBodyBytes: cfg.Server.MaxBodyBytes(),
+    ServiceName: serviceName, MaxBodyBytes: maxRequestBodyBytes,
     CORS: cfg.CORS,
 })
 ```
 
 That expands to recovery, OTel, logging, optional CORS, and body limit in that
 order.
+
+HTTP timeouts, header size, and request-body size are fixed constants in
+`cmd/server/main.go`; they are intentionally not part of `config.yaml`.
 
 Generated API routes add the embedded OAS request validator and use
 `handler.StrictServerOptions()` for the common `api.Error` response. The

@@ -24,8 +24,6 @@ import (
 	"github.com/piwriw/oas-go-template/internal/otel"
 )
 
-const bytesPerMB = 1 << 20
-
 // Config holds all runtime configuration for the server.
 type Config struct {
 	Server ServerConfig      `mapstructure:"server"`
@@ -49,24 +47,8 @@ type CORSConfig struct {
 
 // ServerConfig carries HTTP server settings.
 type ServerConfig struct {
-	HTTPAddr          string        `mapstructure:"http_addr"`
-	GinMode           string        `mapstructure:"gin_mode"`
-	ReadHeaderTimeout time.Duration `mapstructure:"read_header_timeout"`
-	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
-	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
-	MaxHeaderMB       int           `mapstructure:"max_header_mb"`
-	MaxBodyMB         int64         `mapstructure:"max_body_mb"`
-}
-
-// MaxHeaderBytes converts the configured header limit from MB to bytes for net/http.
-func (cfg ServerConfig) MaxHeaderBytes() int {
-	return cfg.MaxHeaderMB * bytesPerMB
-}
-
-// MaxBodyBytes converts the configured request body limit from MB to bytes for middleware.
-func (cfg ServerConfig) MaxBodyBytes() int64 {
-	return cfg.MaxBodyMB * bytesPerMB
+	HTTPAddr string `mapstructure:"http_addr"`
+	GinMode  string `mapstructure:"gin_mode"`
 }
 
 // Load merges a YAML file over server defaults and validates the resulting runtime configuration.
@@ -99,14 +81,8 @@ func Load(path string) (*Config, error) {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			HTTPAddr:          ":8000",
-			GinMode:           "debug",
-			ReadHeaderTimeout: 5 * time.Second,
-			ReadTimeout:       15 * time.Second,
-			WriteTimeout:      30 * time.Second,
-			IdleTimeout:       60 * time.Second,
-			MaxHeaderMB:       1,
-			MaxBodyMB:         1,
+			HTTPAddr: ":8000",
+			GinMode:  "debug",
 		},
 		DB: db.Config{
 			MaxOpenConns:    25,
@@ -137,28 +113,6 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("invalid server.gin_mode %q (want debug|release|test)", cfg.Server.GinMode)
 	}
 
-	for name, value := range map[string]time.Duration{
-		"server.read_header_timeout": cfg.Server.ReadHeaderTimeout,
-		"server.read_timeout":        cfg.Server.ReadTimeout,
-		"server.write_timeout":       cfg.Server.WriteTimeout,
-		"server.idle_timeout":        cfg.Server.IdleTimeout,
-	} {
-		if value < 0 {
-			return fmt.Errorf("%s must be non-negative", name)
-		}
-	}
-	if cfg.Server.MaxHeaderMB < 0 {
-		return fmt.Errorf("server.max_header_mb must be non-negative")
-	}
-	if cfg.Server.MaxHeaderMB > int(^uint(0)>>1)/bytesPerMB {
-		return fmt.Errorf("server.max_header_mb is too large")
-	}
-	if cfg.Server.MaxBodyMB < 0 {
-		return fmt.Errorf("server.max_body_mb must be non-negative")
-	}
-	if cfg.Server.MaxBodyMB > int64(^uint64(0)>>1)/bytesPerMB {
-		return fmt.Errorf("server.max_body_mb is too large")
-	}
 	if err := validateCORS(cfg.CORS); err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Runtime request validation against the embedded OpenAPI contract.
 - A consistent `api.Error` response for request parsing, routing, handler,
   response serialization, and panic failures.
-- Configurable HTTP read, write, idle, header, and request-body limits.
+- Fixed HTTP read, write, idle, header, and request-body safeguards.
 - Typed client response fields for standard 400, 404, 405, 413, and 500 API
   errors.
 - Configurable CORS policy with preflight handling, credentials, exposed

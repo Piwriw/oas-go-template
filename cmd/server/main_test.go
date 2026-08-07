@@ -22,14 +22,8 @@ import (
 func testConfig() *config.Config {
 	return &config.Config{
 		Server: config.ServerConfig{
-			HTTPAddr:          ":0",
-			GinMode:           "test",
-			ReadHeaderTimeout: 2 * time.Second,
-			ReadTimeout:       3 * time.Second,
-			WriteTimeout:      4 * time.Second,
-			IdleTimeout:       5 * time.Second,
-			MaxHeaderMB:       1,
-			MaxBodyMB:         1,
+			HTTPAddr: ":0",
+			GinMode:  "test",
 		},
 	}
 }
@@ -264,7 +258,7 @@ func TestRequestBodyLimitUsesAPIError(t *testing.T) {
 	cfg := testConfig()
 	srv := newHTTPServer(cfg, nil)
 	rec := httptest.NewRecorder()
-	payload := strings.Repeat("x", int(cfg.Server.MaxBodyBytes())+1)
+	payload := strings.Repeat("x", int(maxRequestBodyBytes)+1)
 	req := httptest.NewRequest(http.MethodPost, "/healthz", strings.NewReader(payload))
 	srv.Handler.ServeHTTP(rec, req)
 
@@ -280,18 +274,18 @@ func TestRequestBodyLimitUsesAPIError(t *testing.T) {
 	}
 }
 
-// TestHTTPServerProtectionConfig verifies configured timeout and header protections reach the HTTP server.
-func TestHTTPServerProtectionConfig(t *testing.T) {
+// TestHTTPServerProtections verifies fixed timeout and header protections reach the HTTP server.
+func TestHTTPServerProtections(t *testing.T) {
 	cfg := testConfig()
 	srv := newHTTPServer(cfg, nil)
 
-	if srv.ReadHeaderTimeout != cfg.Server.ReadHeaderTimeout || srv.ReadTimeout != cfg.Server.ReadTimeout {
+	if srv.ReadHeaderTimeout != serverReadHeaderTimeout || srv.ReadTimeout != serverReadTimeout {
 		t.Errorf("read timeouts = %v/%v", srv.ReadHeaderTimeout, srv.ReadTimeout)
 	}
-	if srv.WriteTimeout != cfg.Server.WriteTimeout || srv.IdleTimeout != cfg.Server.IdleTimeout {
+	if srv.WriteTimeout != serverWriteTimeout || srv.IdleTimeout != serverIdleTimeout {
 		t.Errorf("write/idle timeouts = %v/%v", srv.WriteTimeout, srv.IdleTimeout)
 	}
-	if srv.MaxHeaderBytes != cfg.Server.MaxHeaderBytes() {
+	if srv.MaxHeaderBytes != maxRequestHeaderBytes {
 		t.Errorf("MaxHeaderBytes = %d", srv.MaxHeaderBytes)
 	}
 }
