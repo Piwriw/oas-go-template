@@ -13,7 +13,7 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Task | Command |
 |------|---------|
 | Regenerate code from `spec/openapi.yaml` | `make gen` |
-| Build server + client | `make build` |
+| Build server | `make build` |
 | Run server (with ldflags) | `make run` |
 | Run all tests | `make test` |
 | Run a single test | `go test -run TestLoad_fullYAML ./internal/config` |

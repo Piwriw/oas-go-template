@@ -116,7 +116,7 @@ jobs:
       - name: Helm lint
         run: make helm-lint
 
-      - name: Build server + client
+      - name: Build server
         run: make build
 
   docker:

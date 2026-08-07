@@ -66,7 +66,7 @@ Inputs (ask me for any that are missing before you start):
 Procedure:
 1. git clone https://github.com/piwriw/oas-go-template.git "$TARGET_PATH"
 2. cd "$TARGET_PATH"
-3. rm -rf .git bin client && git init -q && git branch -m main
+3. rm -rf .git bin && git init -q && git branch -m main
 4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
 5. If GITHUB_HOSTED != yes: rm -rf .github/
    (Otherwise leave it. The renamer has already rewritten every
@@ -109,7 +109,7 @@ For a project you've already initialized (or to explore the template itself):
 ```bash
 make gen       # regenerate *.gen.go (pinned oapi-codegen v2.7.1)
 make tools     # install air for optional local live reload
-make build     # build cmd/server and cmd/client into bin/
+make build     # build cmd/server into bin/
 make run       # go run cmd/server with version ldflags
 make test      # go test -race -cover ./...
 make lint      # golangci-lint v2 (excludes *.gen.go, forbids legacy log)

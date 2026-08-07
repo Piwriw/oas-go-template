@@ -56,7 +56,7 @@
 执行步骤：
 1. git clone https://github.com/piwriw/oas-go-template.git "$TARGET_PATH"
 2. cd "$TARGET_PATH"
-3. rm -rf .git bin client && git init -q && git branch -m main
+3. rm -rf .git bin && git init -q && git branch -m main
 4. ./scripts/init-project.sh "$MODULE_PATH" "$SHORT_NAME"
 5. 如果 GITHUB_HOSTED != yes：rm -rf .github/
    （否则保留。重命名脚本已经把 .github/ 里所有 github.com/piwriw/oas-go-template
@@ -94,7 +94,7 @@ author 的值再继续。
 ```bash
 make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go（固定 oapi-codegen v2.7.1）
 make tools     # 安装可选的本地热重载工具 air
-make build     # 编译 cmd/server 和 cmd/client 到 bin/
+make build     # 编译 cmd/server 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server
 make test      # go test -race -cover ./...
 make lint      # golangci-lint v2（排除 *.gen.go，禁止 legacy log 包）

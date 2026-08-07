@@ -1,9 +1,10 @@
 # Binaries
 /bin/
 /dist/
-# Bare `go build ./cmd/server` / `go build ./cmd/client` from repo root drops
-# `server` / `client` binaries in . — use `make build` to put them under bin/.
+# Bare `go build ./cmd/server` from repo root drops a `server` binary in . —
+# use `make build` to put it under bin/.
 /server
+# Ignore client binaries left by earlier template versions.
 /client
 *.exe
 *.exe~

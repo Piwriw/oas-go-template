@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen tools contract-check supply-chain-check build run run-client test lint lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen tools contract-check supply-chain-check build run test lint lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -37,16 +37,12 @@ supply-chain-check:  ## Verify Go, tool, Docker image, and GitHub Action pins
 tools:  ## Install pinned local-only tools (Go tools run directly from go.mod)
 	go install github.com/air-verse/air@$(AIR_VERSION)
 
-build:  ## Build server and client binaries into ./bin (with version ldflags)
+build:  ## Build server binary into ./bin (with version ldflags)
 	mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/server ./cmd/server
-	go build -ldflags "$(LDFLAGS)" -o bin/client ./cmd/client
 
 run:  ## Run server locally (with version ldflags)
 	go run -ldflags "$(LDFLAGS)" ./cmd/server
-
-run-client:  ## Run client locally (assumes server is up)
-	go run ./cmd/client
 
 test:  ## Run all tests
 	go test -race -cover ./...

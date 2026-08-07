@@ -34,7 +34,6 @@ Don't use this skill for:
 | `scripts/gen.sh` | Calls oapi-codegen 5 times to produce types + server + client + embedded spec. | No |
 | `config.example.yaml` | Sample config; copy to `config.yaml` (gitignored) and edit. | Yes — your real defaults go here |
 | `cmd/server/main.go` | Server entrypoint. Wires config → otel → gin → handler. | Rename `serviceName` (auto by init script); otherwise rarely |
-| `cmd/client/main.go` | Example client of `pkg/api`. | Optional |
 | `internal/api/*.gen.go` | **Generated**. Server types + gin bindings + `StrictServerInterface` + embedded OAS document. | Never hand-edit |
 | `internal/handler/` | Your business logic. Implements `StrictServerInterface`. | **Yes — real logic here** |
 | `internal/config/` | Loads `config.yaml` and validates. | Add fields as needed |
@@ -75,7 +74,7 @@ runtime `db.driver` may still disable the selected database dependency.
 # from where you want the new project to live
 cp -r /path/to/oas-go-template ./my-new-project
 cd ./my-new-project
-rm -rf .git bin client   # drop the template's history + build artifacts
+rm -rf .git bin          # drop the template's history + build artifacts
 git init
 git branch -m main
 ```
@@ -251,9 +250,8 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 | Target | What |
 |--------|------|
 | `make gen` | Regenerate `*.gen.go` from `spec/openapi.yaml` |
-| `make build` | Build `bin/server` and `bin/client` (with version ldflags) |
+| `make build` | Build `bin/server` (with version ldflags) |
 | `make run` | `go run` server (with ldflags) |
-| `make run-client` | `go run` client |
 | `make test` | `go test -race -cover ./...` |
 | `make lint` | Official `golangci-lint` binary, `golangci-lint run` (v2) |
 | `make lint-config` | Verify the golangci-lint v2 configuration |
@@ -465,10 +463,6 @@ Don't reach for a package-level global `db.DB`. The template already wires `*gor
 ### 16. Don't use the `log` package — `log/slog` only
 
 The repo's `.golangci.yml` enables `forbidigo` with `analyze-types: true` and anchored patterns `^log\.(Print|Fatal|Panic)(ln|f)?$`. The legacy `log` package is forbidden; use `log/slog` for all logging. For process exit on error, `slog.Error(...)` + `os.Exit(1)` instead of `log.Fatalf`.
-
-### 17. The `client` binary in repo root is a build artifact
-
-`go build ./cmd/client` from the repo root drops a `client` binary in `.`. Don't commit it. `make build` correctly puts binaries under `bin/`; running bare `go build` doesn't.
 
 ## Daily Workflow Once Renamed
 
