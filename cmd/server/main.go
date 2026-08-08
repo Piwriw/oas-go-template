@@ -111,7 +111,6 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 	middleware.Use(r, middleware.Options{
 		ServiceName:  serviceName,
 		MaxBodyBytes: maxRequestBodyBytes,
-		CORS:         cfg.CORS,
 	})
 	r.NoRoute(handler.NoRoute)
 	r.NoMethod(handler.NoMethod)

@@ -17,8 +17,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Fixed HTTP read, write, idle, header, and request-body safeguards.
 - Typed client response fields for standard 400, 404, 405, 413, and 500 API
   errors.
-- Configurable CORS policy with preflight handling, credentials, exposed
-  headers, and stable typed 403 responses for disallowed origins.
+- Built-in CORS policy that allows every origin without credentials, handles
+  preflight requests, and exposes request IDs to browser clients.
 - An extensible global Gin middleware chain with a documented custom-handler
   extension point.
 - `make tools` for installing pinned versions of the development tools.

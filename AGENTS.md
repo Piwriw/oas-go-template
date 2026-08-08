@@ -77,12 +77,15 @@ built-in chain in this order:
 ```go
 middleware.Use(r, middleware.Options{
     ServiceName: serviceName, MaxBodyBytes: maxRequestBodyBytes,
-    CORS: cfg.CORS,
 })
 ```
 
-That expands to recovery, OTel, logging, optional CORS, and body limit in that
+That expands to recovery, OTel, logging, CORS, and body limit in that
 order.
+
+CORS is code-owned rather than configurable. It always allows every origin
+without credentials, permits GET/POST/PUT/PATCH/DELETE/OPTIONS, exposes the
+request ID response header, and caches preflight responses for 12 hours.
 
 HTTP timeouts, header size, and request-body size are fixed constants in
 `cmd/server/main.go`; they are intentionally not part of `config.yaml`.

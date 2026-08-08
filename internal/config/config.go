@@ -30,19 +30,6 @@ type Config struct {
 	DB     db.Config         `mapstructure:"db"`
 	Log    logging.LogConfig `mapstructure:"log"`
 	OTel   otel.Config       `mapstructure:"otel"`
-	CORS   CORSConfig        `mapstructure:"cors"`
-}
-
-// CORSConfig carries cross-origin request policy. CORS is disabled by default;
-// when enabled, at least one explicit origin must be configured.
-type CORSConfig struct {
-	Enabled          bool          `mapstructure:"enabled"`
-	AllowOrigins     []string      `mapstructure:"allow_origins"`
-	AllowMethods     []string      `mapstructure:"allow_methods"`
-	AllowHeaders     []string      `mapstructure:"allow_headers"`
-	ExposeHeaders    []string      `mapstructure:"expose_headers"`
-	AllowCredentials bool          `mapstructure:"allow_credentials"`
-	MaxAge           time.Duration `mapstructure:"max_age"`
 }
 
 // ServerConfig carries HTTP server settings.
@@ -97,12 +84,6 @@ func defaults() Config {
 		OTel: otel.Config{
 			Enabled: true,
 		},
-		CORS: CORSConfig{
-			AllowMethods:  []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-			AllowHeaders:  []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
-			ExposeHeaders: []string{"X-Request-ID"},
-			MaxAge:        12 * time.Hour,
-		},
 	}
 }
 
@@ -112,10 +93,6 @@ func validate(cfg *Config) error {
 	case "debug", "release", "test":
 	default:
 		return fmt.Errorf("invalid server.gin_mode %q (want debug|release|test)", cfg.Server.GinMode)
-	}
-
-	if err := validateCORS(cfg.CORS); err != nil {
-		return err
 	}
 
 	switch strings.ToLower(cfg.Log.Format) {
@@ -138,34 +115,6 @@ func validate(cfg *Config) error {
 			}
 		default:
 			return fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.DB.Driver)
-		}
-	}
-	return nil
-}
-
-// validateCORS rejects unsafe or incomplete cross-origin request policies.
-func validateCORS(cfg CORSConfig) error {
-	if cfg.MaxAge < 0 {
-		return fmt.Errorf("cors.max_age must be non-negative")
-	}
-	for _, origin := range cfg.AllowOrigins {
-		if cfg.AllowCredentials && strings.TrimSpace(origin) == "*" {
-			return fmt.Errorf("cors.allow_credentials cannot be true when cors.allow_origins contains *")
-		}
-	}
-	if !cfg.Enabled {
-		return nil
-	}
-	if len(cfg.AllowOrigins) == 0 {
-		return fmt.Errorf("cors.allow_origins must contain at least one origin when cors.enabled is true")
-	}
-	for _, origin := range cfg.AllowOrigins {
-		origin = strings.TrimSpace(origin)
-		if origin == "" {
-			return fmt.Errorf("cors.allow_origins must not contain an empty origin")
-		}
-		if origin != "*" && !strings.HasPrefix(origin, "http://") && !strings.HasPrefix(origin, "https://") {
-			return fmt.Errorf("invalid cors.allow_origins value %q (want http://, https://, or *)", origin)
 		}
 	}
 	return nil

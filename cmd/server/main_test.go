@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
@@ -84,35 +83,9 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 	}
 }
 
-// TestCORSIsDisabledByDefault verifies ordinary responses omit cross-origin headers without explicit policy.
-func TestCORSIsDisabledByDefault(t *testing.T) {
+// TestCORSAllowsAllOriginsAndPreflight verifies the built-in browser policy accepts every origin.
+func TestCORSAllowsAllOriginsAndPreflight(t *testing.T) {
 	srv := newHTTPServer(testConfig(), nil)
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	req.Header.Set("Origin", "https://app.example.com")
-	srv.Handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
-	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Errorf("CORS unexpectedly enabled: Access-Control-Allow-Origin=%q", got)
-	}
-}
-
-// TestCORSAllowedOriginAndPreflight verifies approved origins receive response and preflight access headers.
-func TestCORSAllowedOriginAndPreflight(t *testing.T) {
-	cfg := testConfig()
-	cfg.CORS = config.CORSConfig{
-		Enabled:          true,
-		AllowOrigins:     []string{"https://app.example.com"},
-		AllowMethods:     []string{"GET", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "X-Request-ID"},
-		ExposeHeaders:    []string{"X-Request-ID"},
-		AllowCredentials: true,
-		MaxAge:           time.Hour,
-	}
-	srv := newHTTPServer(cfg, nil)
 
 	t.Run("normal request", func(t *testing.T) {
 		rec := httptest.NewRecorder()
@@ -123,11 +96,11 @@ func TestCORSAllowedOriginAndPreflight(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
 			t.Errorf("allow origin=%q", got)
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
-			t.Errorf("allow credentials=%q", got)
+		if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "" {
+			t.Errorf("allow credentials=%q, want empty", got)
 		}
 		if got := rec.Header().Get("Access-Control-Expose-Headers"); got != "X-Request-Id" {
 			t.Errorf("expose headers=%q", got)
@@ -137,7 +110,7 @@ func TestCORSAllowedOriginAndPreflight(t *testing.T) {
 	t.Run("preflight", func(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodOptions, "/healthz", nil)
-		req.Header.Set("Origin", "https://app.example.com")
+		req.Header.Set("Origin", "https://another.example")
 		req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 		req.Header.Set("Access-Control-Request-Headers", "Content-Type, X-Request-ID")
 		srv.Handler.ServeHTTP(rec, req)
@@ -145,44 +118,19 @@ func TestCORSAllowedOriginAndPreflight(t *testing.T) {
 		if rec.Code != http.StatusNoContent {
 			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
 			t.Errorf("allow origin=%q", got)
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET,OPTIONS" {
+		if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET,POST,PUT,PATCH,DELETE,OPTIONS" {
 			t.Errorf("allow methods=%q", got)
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type,X-Request-Id" {
+		if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Origin,Content-Type,Accept,Authorization,X-Request-Id" {
 			t.Errorf("allow headers=%q", got)
 		}
-		if got := rec.Header().Get("Access-Control-Max-Age"); got != "3600" {
+		if got := rec.Header().Get("Access-Control-Max-Age"); got != "43200" {
 			t.Errorf("max age=%q", got)
 		}
 	})
-}
-
-// TestCORSRejectsDisallowedOrigin verifies unapproved browser origins receive a stable forbidden response.
-func TestCORSRejectsDisallowedOrigin(t *testing.T) {
-	cfg := testConfig()
-	cfg.CORS = config.CORSConfig{
-		Enabled:      true,
-		AllowOrigins: []string{"https://app.example.com"},
-		AllowMethods: []string{"GET", "OPTIONS"},
-	}
-	srv := newHTTPServer(cfg, nil)
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	req.Header.Set("Origin", "https://attacker.example")
-	srv.Handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
-	}
-	if rec.Body.Len() != 0 {
-		t.Errorf("body=%q, want empty", rec.Body.String())
-	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Errorf("disallowed origin got CORS header=%q", got)
-	}
 }
 
 // TestOASValidatorRejectsMissingRequiredQuery verifies contract-required inputs are enforced before handlers run.
