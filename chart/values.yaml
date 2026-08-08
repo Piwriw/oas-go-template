@@ -44,6 +44,7 @@ server:
     log:
       format: json
       level: info
+      caller: true
     otel:
       enabled: false
       exporter_otlp_endpoint: "http://otel-collector:4318"

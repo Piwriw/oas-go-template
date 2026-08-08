@@ -33,6 +33,7 @@ db:
 log:
   format: json
   level: debug
+  caller: false
 otel:
   enabled: false
   exporter_otlp_endpoint: "http://collector:4318"
@@ -56,7 +57,7 @@ otel:
 	if cfg.DB.ConnMaxLifetime != time.Hour {
 		t.Errorf("ConnMaxLifetime = %v", cfg.DB.ConnMaxLifetime)
 	}
-	if cfg.Log.Format != "json" || cfg.Log.Level != "debug" {
+	if cfg.Log.Format != "json" || cfg.Log.Level != "debug" || cfg.Log.Caller {
 		t.Errorf("Log = %+v", cfg.Log)
 	}
 	if cfg.OTel.Enabled {
@@ -237,6 +238,9 @@ server:
 	}
 	if cfg.Log.Format != "text" || cfg.Log.Level != "info" {
 		t.Errorf("Log defaults dropped: got %+v", cfg.Log)
+	}
+	if !cfg.Log.Caller {
+		t.Errorf("Log.Caller default should be true")
 	}
 	if !cfg.OTel.Enabled {
 		t.Errorf("OTel.Enabled default should be true")

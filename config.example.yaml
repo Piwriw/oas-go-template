@@ -19,6 +19,7 @@ db:
 log:
   format: text               # text | json
   level: info                # debug | info | warn | error
+  caller: true                # include caller file and line in each record
 
 otel:
   enabled: true              # false = skip SDK init entirely

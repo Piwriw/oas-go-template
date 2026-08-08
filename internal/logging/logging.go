@@ -9,6 +9,7 @@
 //
 //	format = text | json   (default: text)
 //	level  = debug | info | warn | error   (default: info)
+//	caller = true | false   (default: true)
 package logging
 
 import (
@@ -38,11 +39,15 @@ const (
 type LogConfig struct {
 	Format string `mapstructure:"format"`
 	Level  string `mapstructure:"level"`
+	Caller bool   `mapstructure:"caller"`
 }
 
 // New builds the process logger from the validated output format and severity configuration.
 func New(cfg LogConfig) *slog.Logger {
-	opts := &slog.HandlerOptions{Level: parseLevel(cfg.Level)}
+	opts := &slog.HandlerOptions{
+		Level:     parseLevel(cfg.Level),
+		AddSource: cfg.Caller,
+	}
 	var inner slog.Handler
 	if strings.EqualFold(strings.TrimSpace(cfg.Format), "json") {
 		inner = slog.NewJSONHandler(os.Stderr, opts)

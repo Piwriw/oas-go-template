@@ -92,6 +92,7 @@ func defaults() Config {
 		Log: logging.LogConfig{
 			Format: "text",
 			Level:  "info",
+			Caller: true,
 		},
 		OTel: otel.Config{
 			Enabled: true,

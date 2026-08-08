@@ -125,6 +125,7 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **Test behavior, not plumbing**: do not add unit tests that merely re-verify Go standard-library or third-party behavior, or straightforward field-to-option assignments. For configuration switches, cover built-in defaults and explicit YAML overrides at the `config.Load` boundary; add deeper behavior tests only when the project implements custom branching, transformation, or failure handling.
 - **Database model field comments**: every field in a non-generated persistent database model must have a concise comment line immediately above the field declaration. The comment must describe the field's business meaning; trailing comments do not satisfy this requirement. Never edit `*.gen.go` to add these comments.
 - **Named constants without over-extraction**: values that are reused or define business/protocol invariants (route paths, context keys, header names, etc.) belong in a named `const` block immediately after the imports. Do not extract one-off SQL fragments, column names, sort expressions, or other local implementation details merely to avoid literals; keep them at the call site and prefer typed library APIs that eliminate repeated strings. Repeated values used across `switch` cases or conditionals still require named constants.
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
