@@ -62,7 +62,7 @@ func TestExampleStoreCreateGetAndList(t *testing.T) {
 	}
 }
 
-// TestExampleStoreUpdateAndDelete verifies mutable fields and missing-record errors.
+// TestExampleStoreUpdateAndDelete verifies mutable fields and idempotent writes for missing records.
 func TestExampleStoreUpdateAndDelete(t *testing.T) {
 	exampleStore := openExampleStore(t)
 	ctx := context.Background()
@@ -89,11 +89,14 @@ func TestExampleStoreUpdateAndDelete(t *testing.T) {
 	if _, err := exampleStore.GetByID(ctx, example.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("GetByID after delete error = %v, want %v", err, store.ErrNotFound)
 	}
-	if err := exampleStore.Update(ctx, example); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("Update deleted example error = %v, want %v", err, store.ErrNotFound)
+	if err := exampleStore.Update(ctx, example); err != nil {
+		t.Fatalf("Update deleted example: %v, want nil", err)
 	}
-	if err := exampleStore.Delete(ctx, example.ID); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("Delete deleted example error = %v, want %v", err, store.ErrNotFound)
+	if _, err := exampleStore.GetByID(ctx, example.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("GetByID after missing update error = %v, want %v", err, store.ErrNotFound)
+	}
+	if err := exampleStore.Delete(ctx, example.ID); err != nil {
+		t.Fatalf("repeated Delete(%d): %v, want nil", example.ID, err)
 	}
 }
 

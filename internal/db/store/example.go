@@ -67,35 +67,19 @@ func (s *ExampleStore) Update(ctx context.Context, example *models.Example) erro
 		return fmt.Errorf("update example: %w", gorm.ErrInvalidValue)
 	}
 
-	result := s.db.WithContext(ctx).
+	if err := s.db.WithContext(ctx).
 		Model(&models.Example{}).
 		Where("id = ?", example.ID).
-		Update("name", example.Name)
-	if result.Error != nil {
-		return fmt.Errorf("update example %d: %w", example.ID, result.Error)
-	}
-	if result.RowsAffected > 0 {
-		return nil
-	}
-
-	var existing models.Example
-	if err := s.db.WithContext(ctx).Select("id").First(&existing, example.ID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("update example %d: %w", example.ID, ErrNotFound)
-		}
-		return fmt.Errorf("check example %d after update: %w", example.ID, err)
+		Update("name", example.Name).Error; err != nil {
+		return fmt.Errorf("update example %d: %w", example.ID, err)
 	}
 	return nil
 }
 
 // Delete removes the example identified by its primary key.
 func (s *ExampleStore) Delete(ctx context.Context, id uint64) error {
-	result := s.db.WithContext(ctx).Delete(&models.Example{}, id)
-	if result.Error != nil {
-		return fmt.Errorf("delete example %d: %w", id, result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("delete example %d: %w", id, ErrNotFound)
+	if err := s.db.WithContext(ctx).Delete(&models.Example{}, id).Error; err != nil {
+		return fmt.Errorf("delete example %d: %w", id, err)
 	}
 	return nil
 }
