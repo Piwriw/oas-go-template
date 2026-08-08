@@ -181,6 +181,17 @@ For sqlite tests use `file::memory:?cache=shared` plus `max_open_conns: 1`
 (see `internal/db/db_test.go`) — without that, each pool connection gets its
 own private memory DB.
 
+`internal/db.Paginate` provides one-based, bounded pagination with matching
+count metadata. Pass it a query containing the filters and an explicit stable
+order; page sizes default to 10 and are capped at 10000:
+
+```go
+page, err := db.Paginate[User](ctx,
+	gdb.Where("status = ?", "active").Order("id ASC"),
+	db.Pagination{Page: 2, PageSize: 25},
+)
+```
+
 SQL migrations run automatically after the startup database ping. Add every
 schema change under `internal/db/migrations/` as a unique UTC timestamped pair:
 

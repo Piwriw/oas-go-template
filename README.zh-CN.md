@@ -152,6 +152,16 @@ db:
 
 每条 SQL 操作都会通过 `gorm.io/plugin/opentelemetry` 成为 OTel span。sqlite 测试用 `file::memory:?cache=shared` 加 `max_open_conns: 1`（见 `internal/db/db_test.go`）——否则连接池里每个连接会拿到独立的内存数据库。
 
+`internal/db.Paginate` 提供从 1 开始、限制单页大小并返回总数元数据的通用分页。
+调用方传入筛选条件和明确、稳定的排序；单页默认 10 条，最多 10000 条：
+
+```go
+page, err := db.Paginate[User](ctx,
+	gdb.Where("status = ?", "active").Order("id ASC"),
+	db.Pagination{Page: 2, PageSize: 25},
+)
+```
+
 服务启动时完成数据库 ping 后会自动执行 SQL 迁移。每次表结构变化都在
 `internal/db/migrations/` 下新增一对唯一的 UTC 时间版本文件：
 
