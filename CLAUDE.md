@@ -125,6 +125,7 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **Database model field comments**: every field in a non-generated persistent database model must have a concise comment line immediately above the field declaration. The comment must describe the field's business meaning; trailing comments do not satisfy this requirement. Never edit `*.gen.go` to add these comments.
 - **Named constants at the top**: package-scoped fixed values, especially repeated strings and values used in control flow (route paths, context keys, header names, etc.), belong in a named `const` block immediately after the imports. Do not scatter string literals through `switch` cases or conditionals.
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
 - **`os.Exit(0)` after defers**: gocritic's `exitAfterDefer` will fail lint. `main` returns through `run()` and exits via `os.Exit(1)` only on error — keep it that way.
