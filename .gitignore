@@ -41,8 +41,12 @@ coverage.html
 
 # Node (web/)
 node_modules/
+# Legacy static output from the previous Vite frontend.
 web/dist/
 web/.vite/
+# Next.js build output.
+web/.next/
+web/out/
 
 # Air live-reload tmp
 /tmp/

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-# Builder: install deps (cached layer) and run vite build → ./dist
+# Builder: install deps (cached layer) and run the Next static export → ./out
 FROM node:22-alpine AS builder
 
 WORKDIR /src
@@ -23,6 +23,6 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Static assets from builder stage. Default nginx html dir.
-COPY --from=builder /src/dist /usr/share/nginx/html
+COPY --from=builder /src/out /usr/share/nginx/html
 
 EXPOSE 8080

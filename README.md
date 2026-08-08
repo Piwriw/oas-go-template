@@ -15,7 +15,7 @@ that contract.
 
 Ships with: gin + strict-server codegen, gorm (opt-in), OTel traces+metrics
 (OTLP + Prometheus pull), slog with trace_id injection, Dockerfile, Helm chart,
-golangci-lint v2 config, and a Vite + React + TS frontend (deployed separately).
+golangci-lint v2 config, and a Next.js + React + TS frontend (deployed separately).
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ golangci-lint v2 config, and a Vite + React + TS frontend (deployed separately).
 - Gorm (ORM, postgres/mysql/sqlite — opt-in)
 - OpenTelemetry (traces via OTLP HTTP, metrics via OTLP + Prometheus pull)
 - slog (structured logging, trace_id injected per request)
-- React + Vite + TypeScript (frontend, independent deploy)
+- Next.js + React + TypeScript (frontend, independent deploy)
 - Docker / golangci-lint v2 / Make / Helm
 
 ## Initialize a New Project from This Template

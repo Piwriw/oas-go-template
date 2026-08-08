@@ -7,7 +7,7 @@ description: Use when starting a new Go project from the oas-go-template boilerp
 
 ## Overview
 
-`oas-go-template` is a Go project template built around OpenAPI Specification 3.x as the single source of truth. It generates gin server stubs and a client SDK from `spec/openapi.yaml` via `oapi-codegen`, ships with config/middleware/otel/version/errcode modules, a Dockerfile, Makefile, golangci-lint config, a Helm chart, and a Vite + React + TS frontend.
+`oas-go-template` is a Go project template built around OpenAPI Specification 3.x as the single source of truth. It generates gin server stubs and a client SDK from `spec/openapi.yaml` via `oapi-codegen`, ships with config/middleware/otel/version/errcode modules, a Dockerfile, Makefile, golangci-lint config, a Helm chart, and a Next.js + React + TS frontend.
 
 This skill tells you how to take the template and turn it into your own project: collect the required choices, run the rename script, retain one database driver, swap in your API, regenerate code, and avoid the traps that bit during the original build.
 
@@ -43,7 +43,7 @@ Don't use this skill for:
 | `internal/errcode/` | Typed int32 error codes returned in `api.Error.Code`. | Yes — add codes for your domains |
 | `internal/version/` | Holds `Version` / `GitCommit` / `BuildTime` for ldflags. | No |
 | `pkg/api/*.gen.go` | **Generated**. Client SDK + client-side types + embedded OAS doc (`GetSpec()` / `GetSpecJSON()`). | Never hand-edit |
-| `web/` | Vite + React + TS frontend (independent deploy). | Replace with your UI |
+| `web/` | Next.js + React + TS frontend with static export (independent deploy). | Replace with your UI |
 | `build/Dockerfile` | Multi-stage build → static Go binary in alpine. | No |
 | `build/otelcol/config.yaml` | Local OTel collector pipeline (OTLP in → Jaeger + debug out). | Tweak exporters if you want Tempo/Prometheus instead |
 | `docker-compose.yml` | Local Jaeger + otel-collector for trace verification. | No |
@@ -258,11 +258,11 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 | `make fmt` | `go tool goimports` with `-local <module>` to enforce import grouping |
 | `make audit` | `go tool govulncheck` + isolated `go run ...gosec@version` (CI gate; non-zero on any finding) |
 | `make docker` | Build server image (pass `GOPROXY=...` if behind GFW; passes `VERSION/GIT_COMMIT/BUILD_TIME` via build-arg) |
-| `make web-docker` | Build frontend image (multi-stage node → nginx-unprivileged on :8080) |
+| `make web-docker` | Build frontend image (Next static export → nginx-unprivileged on :8080) |
 | `make helm-lint` / `make helm-template` | Validate / render the Helm chart |
 | `make web-dev` / `make web-build` | Frontend dev server / production build |
 | `make dev-stack` / `make dev-stack-down` | Start / stop local Jaeger + OTel collector |
-| `make clean` | Remove `bin/` and `web/dist/` |
+| `make clean` | Remove `bin/` and `web/out/` |
 
 ## Verifying OTel end-to-end
 

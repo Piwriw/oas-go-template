@@ -1,6 +1,7 @@
 # oas-go-template web
 
-Frontend SPA. Independent from backend; deploys separately to CDN/Nginx.
+Next.js App Router frontend. It is independent from the Go backend and is
+deployed as a static export served by CDN or Nginx.
 
 ## Dev
 
@@ -13,47 +14,22 @@ npm run dev
 
 ```bash
 npm run build
-# outputs to dist/
+# outputs to out/
 ```
+
+For local production verification, serve the exported directory with any
+static file server:
+
+```bash
+npm run build
+python3 -m http.server 8080 --directory out
+```
+
+The Docker image uses the static `out/` export and serves it on port `8080`.
 
 ## API Client
 
-前端 OAS client 不在本模板初始范围内,预留 `src/api/` 目录占位。
-后续如需,可基于 `../spec/openapi.yaml` 用 `openapi-typescript` 或 `openapi-fetch` 生成前端 client。
-
----
-
-Below is the original Vite + React + TypeScript template README.
-
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The frontend OAS client is intentionally not included in this template. If
+needed, generate a TypeScript client from `../spec/openapi.yaml` with
+`openapi-typescript` and/or `openapi-fetch`, placing generated files under
+`src/api/`.

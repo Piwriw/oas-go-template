@@ -92,7 +92,7 @@ web-build:  ## Build frontend
 	cd web && npm run build
 
 clean:  ## Remove build artifacts
-	rm -rf bin web/dist
+	rm -rf bin web/out
 
 dev-stack:  ## Start local OTel collector + Jaeger (docker compose up -d)
 	docker compose up -d

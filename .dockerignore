@@ -10,6 +10,8 @@
 /bin
 /dist
 /web/dist
+/web/.next
+/web/out
 /web/node_modules
 
 # Docs / specs not needed at runtime

@@ -111,7 +111,7 @@ separate shutdown state or drain delay. Keep the Helm
 
 ### Frontend is independent
 
-`web/` (Vite + React + TS) deploys separately from the server. `web/Dockerfile` is multi-stage (node → nginx-unprivileged on `:8080`); backend runs on `:8000`. The server does **not** serve `web/dist`. There is no typed client generated into `web/src/api/` — that's intentional (left for the user's stack choice).
+`web/` (Next.js + React + TS) deploys separately from the server as a static export. `web/Dockerfile` is multi-stage (node build → nginx-unprivileged on `:8080`); backend runs on `:8000`. The server does **not** serve `web/out`. There is no typed client generated into `web/src/api/` — that's intentional (left for the user's stack choice).
 
 ### Developer tool management
 

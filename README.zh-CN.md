@@ -9,7 +9,7 @@
 
 一个 Go 项目模板，**以 `spec/openapi.yaml` 为唯一事实来源**。服务端 stub 和客户端 SDK 通过 [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen)（StrictServerInterface 模式）从 OAS 自动生成。所有其它代码（config、otel、logging、db、handler、errcode）都是为这份契约服务的辅助层。
 
-开箱即用：gin + strict-server 代码生成、Gorm（可选）、OpenTelemetry traces+metrics（OTLP 推送 + Prometheus 拉取）、带 trace_id 注入的 slog、Dockerfile、Helm chart、golangci-lint v2 配置，以及独立部署的 Vite + React + TS 前端。
+开箱即用：gin + strict-server 代码生成、Gorm（可选）、OpenTelemetry traces+metrics（OTLP 推送 + Prometheus 拉取）、带 trace_id 注入的 slog、Dockerfile、Helm chart、golangci-lint v2 配置，以及独立部署的 Next.js + React + TS 前端。
 
 ## 目录
 
@@ -32,7 +32,7 @@
 - Gorm（ORM，支持 postgres/mysql/sqlite — 可选启用）
 - OpenTelemetry（traces 走 OTLP HTTP，metrics 走 OTLP + Prometheus 拉取）
 - slog（结构化日志，按请求注入 trace_id）
-- React + Vite + TypeScript（前端，独立部署）
+- Next.js + React + TypeScript（前端，独立部署）
 - Docker / golangci-lint v2 / Make / Helm
 
 ## 从模板初始化新项目

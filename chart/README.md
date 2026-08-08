@@ -1,7 +1,7 @@
 # oas-go-template Helm Chart
 
-Deploys the oas-go-template backend (gin server) and frontend (React SPA
-served by nginx) into Kubernetes.
+Deploys the oas-go-template backend (gin server) and frontend (Next.js static
+export served by nginx) into Kubernetes.
 
 ## Layout
 
