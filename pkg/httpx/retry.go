@@ -49,7 +49,7 @@ func (p RetryPolicy) backoff(attempt int) time.Duration {
 		return 0
 	}
 	d := float64(p.Initial)
-	for i := 0; i < attempt; i++ {
+	for range attempt {
 		d *= p.Multiplier
 	}
 	if p.Max > 0 && d > float64(p.Max) {

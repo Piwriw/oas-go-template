@@ -56,7 +56,7 @@ func TestRetryPolicy_Backoff_NoJitter(t *testing.T) {
 func TestRetryPolicy_Backoff_JitterInRange(t *testing.T) {
 	p := DefaultRetry() // Jitter 0.2
 	// attempt 2 → base 400ms → jitter ±80ms → range [320ms, 480ms]
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		got := p.backoff(2)
 		if got < 320*time.Millisecond || got > 480*time.Millisecond {
 			t.Errorf("backoff(2) = %v, want within [320ms, 480ms]", got)
