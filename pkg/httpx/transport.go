@@ -15,7 +15,7 @@ import (
 )
 
 // tracer is package-wide; otel.Tracer returns a no-op tracer when OTel
-// isn't initialized (matches the pattern in internal/handler/version.go).
+// isn't initialized (matches the pattern in internal/service/version.go).
 var tracer = otel.Tracer("github.com/piwriw/oas-go-template/pkg/httpx")
 
 // logTransport logs every RoundTrip attempt with method, URL, status, elapsed,

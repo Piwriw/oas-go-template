@@ -1,4 +1,5 @@
-// Package middleware configures the global Gin middleware chain.
+// Package middleware configures the global Gin middleware chain and the
+// shared API error responses for transport-level failures.
 package middleware
 
 import (
@@ -8,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
-	"github.com/piwriw/oas-go-template/internal/handler"
 	"github.com/piwriw/oas-go-template/internal/logging"
 )
 
@@ -26,12 +26,12 @@ type Options struct {
 // Handlers returns the middleware chain in its required order.
 func Handlers(opts Options, additional ...gin.HandlerFunc) []gin.HandlerFunc {
 	handlers := []gin.HandlerFunc{
-		handler.Recovery(),
+		Recovery(),
 		otelgin.Middleware(opts.ServiceName),
 		logging.Middleware(),
 		corsHandler(),
 	}
-	handlers = append(handlers, handler.BodyLimit(opts.MaxBodyBytes))
+	handlers = append(handlers, BodyLimit(opts.MaxBodyBytes))
 	return append(handlers, additional...)
 }
 

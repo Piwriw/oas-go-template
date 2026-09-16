@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`oas-go-template` is a Go project template where **`spec/openapi.yaml` is the single source of truth**. Server stubs and the client SDK are generated from it via `oapi-codegen` (v2 StrictServerInterface mode). All other code (config, otel, logging, db, handlers) supports that contract.
+`oas-go-template` is a Go project template where **`spec/openapi.yaml` is the single source of truth**. Server stubs and the client SDK are generated from it via `oapi-codegen` (v2 StrictServerInterface mode). All other code (config, otel, logging, db, service, handlers) supports that contract.
 
 For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md is for working **inside** the repo.
 
@@ -48,21 +48,27 @@ For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md i
 
 Handlers in `internal/handler/` implement `api.StrictServerInterface` — a generated interface where each method returns a typed `ResponseObject` (`GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc.). The constructor `api.NewStrictHandler(h, nil)` wraps them; `api.RegisterHandlers(r, strictHandler)` mounts them on gin. There is a compile-time check `var _ api.StrictServerInterface = (*Handler)(nil)` in `internal/handler/handler_test.go` so missing methods fail the build.
 
+Business logic lives in `internal/service` (`service.New(gdb)` wired via `handler.New(svc)`); handlers are thin adapters that map service results and sentinel errors to generated response types — `errcode` mapping happens only there because codes are part of the public API contract. HTTP error plumbing (`Recovery`, `BodyLimit`, `StrictHandlerOptions`, `NoRoute`/`NoMethod`, `OAPIValidationError`, `writeError`) lives in `internal/middleware`, which must not import `internal/handler`.
+
 Response type names come from the OAS status code + schema — **only use names that already exist in `internal/api/spec.gen.go`**, never invent them.
 
 ### Request lifecycle and middleware ordering
 
-`cmd/server/main.go:newHTTPServer` wires the chain in this exact order:
+`cmd/server/main.go:newHTTPServer` wires the chain via `middleware.Use`:
 
 ```go
-r.Use(handler.Recovery(), otelgin.Middleware(serviceName), logging.Middleware(), handler.BodyLimit(maxRequestBodyBytes))
-
-The generated API routes are registered on a separate group with the embedded
-OAS request validator. `/metrics` is intentionally registered outside that
-group because it is an ops endpoint absent from the public contract. Use
-`handler.StrictServerOptions()` for the generated strict handler so parse,
-handler, response, recovery, 404, and 405 errors all return `api.Error`.
+middleware.Use(r, middleware.Options{
+    ServiceName:  serviceName,
+    MaxBodyBytes: maxRequestBodyBytes,
+})
 ```
+
+The chain expands to recovery, otelgin, logging, CORS, then body limit. The
+generated API routes are registered on a separate group with the embedded
+OAS request validator; `/metrics` stays outside that group because it is an
+ops endpoint absent from the public contract. Use
+`middleware.StrictHandlerOptions()` for the generated strict handler so parse,
+handler, response, recovery, 404, and 405 errors all return `api.Error`.
 
 `otelgin` must run **before** `logging.Middleware` — logging reads the active span from `c.Request.Context()` to inject `trace_id` / `span_id` into each slog record (see `internal/logging/logging.go:otelHandler`). Reverse the order and trace context silently disappears from logs.
 
@@ -86,13 +92,13 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 `internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout.
 
-`*gorm.DB` is injected via `handler.New(gdb)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
+`*gorm.DB` is injected via `service.New(gdb)` and the service via `handler.New(svc)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
 
 For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — see `internal/db/db_test.go`. With a connection pool, each connection otherwise gets its own private memory DB.
 
 ### /healthz vs /readyz
 
-Two separate probes in `internal/handler/health.go`:
+Two separate probes — `internal/service/health.go` owns the readiness rule, `internal/handler/health.go` maps it to HTTP:
 - `GET /healthz` — **liveness**. 200 as long as the process is up; returns real `version.Version`.
 - `GET /readyz` — **readiness**. 200 when all configured deps are reachable; a disabled DB is skipped, while a configured DB ping failure returns 503. Don't add expensive checks to `/healthz`.
 
@@ -107,7 +113,7 @@ separate shutdown state or drain delay. Keep the Helm
 
 ### Version injection
 
-`internal/version/version.go` holds `Version` / `GitCommit` / `BuildTime` populated via `-ldflags -X` (see `Makefile:LDFLAGS` and `build/Dockerfile`). `go run` skips ldflags → empty fields → `internal/handler/version.go` degrades to `"dev"` / `"unknown"` so `/version` still returns 200 instead of 500. Don't error on empty version fields.
+`internal/version/version.go` holds `Version` / `GitCommit` / `BuildTime` populated via `-ldflags -X` (see `Makefile:LDFLAGS` and `build/Dockerfile`). `go run` skips ldflags → empty fields → `internal/service/version.go` degrades to `"dev"` / `"unknown"` so `/version` still returns 200 instead of 500. Don't error on empty version fields.
 
 ### Frontend is independent
 

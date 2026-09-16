@@ -33,9 +33,10 @@ Don't use this skill for:
 | `oapi-codegen.yaml` | Generator base config (package name only). | Only if changing package layout |
 | `scripts/gen.sh` | Calls oapi-codegen 5 times to produce types + server + client + embedded spec. | No |
 | `config.example.yaml` | Sample config; copy to `config.yaml` (gitignored) and edit. | Yes — your real defaults go here |
-| `cmd/server/main.go` | Server entrypoint. Wires config → otel → gin → handler. | Rename `serviceName` (auto by init script); otherwise rarely |
+| `cmd/server/main.go` | Server entrypoint. Wires config → otel → gin → service → handler. | Rename `serviceName` (auto by init script); otherwise rarely |
 | `internal/api/*.gen.go` | **Generated**. Server types + gin bindings + `StrictServerInterface` + embedded OAS document. | Never hand-edit |
-| `internal/handler/` | Your business logic. Implements `StrictServerInterface`. | **Yes — real logic here** |
+| `internal/service/` | Your business logic. Transport-agnostic; never imports `internal/api` or `internal/errcode`. | **Yes — real logic here** |
+| `internal/handler/` | Thin adapter: maps `internal/service` results and sentinel errors to `StrictServerInterface` responses. | **Yes — mapping here** |
 | `internal/config/` | Loads `config.yaml` and validates. | Add fields as needed |
 | `internal/db/` | Gorm init, embedded SQL migrations, and three template-time database drivers. | **Yes — retain exactly one driver during initialization** |
 | `internal/logging/` | slog setup with trace_id/span_id/request_id injection. | No |
@@ -189,15 +190,19 @@ Look at the new interface:
 sed -n '/type StrictServerInterface/,/^}/p' internal/api/spec.gen.go
 ```
 
-For each method, add a file in `internal/handler/`. The `Handler` struct is already declared in `internal/handler/handler.go`. Method signature pattern:
+For each method, put the business work in an `internal/service/` method returning domain values or sentinel errors, then add a thin handler in `internal/handler/` that calls it and maps the result to the generated response types. The `Handler` struct is already declared in `internal/handler/handler.go`. Method signature pattern:
 
 ```go
 func (h *Handler) GetFoo(ctx context.Context, req api.GetFooRequestObject) (api.GetFooResponseObject, error) {
+    result, err := h.svc.GetFoo(ctx, req.Params.X)
+    if err != nil {
+        return api.GetFoo500JSONResponse(api.Error{Code: int32(errcode.YourCode), Message: "..."}), nil
+    }
     return api.GetFoo200JSONResponse(api.Foo{...}), nil
 }
 ```
 
-The response types are `GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc. — names come from the status code + schema. **Do not invent response types; only use what's in `internal/api/spec.gen.go`.**
+The response types are `GetFoo200JSONResponse`, `GetFoo500JSONResponse`, etc. — names come from the status code + schema. **Do not invent response types; only use what's in `internal/api/spec.gen.go`.** Map sentinel errors to `errcode` values only in the handler — `internal/service` must not import `internal/api` or `internal/errcode`.
 
 `internal/handler/handler_test.go` already pins the contract with a compile-time assertion:
 
@@ -229,7 +234,7 @@ git add .
 git commit -m "init project"
 ```
 
-Snapshots the renamed-and-verified baseline before you start writing real handlers in `internal/handler/`. Subsequent spec changes and handler work go in their own commits.
+Snapshots the renamed-and-verified baseline before you start writing service methods and handlers in `internal/service/` and `internal/handler/`. Subsequent spec changes and handler work go in their own commits.
 
 ## What `init-project.sh` Touches (transparency)
 
@@ -237,7 +242,7 @@ If you'd rather do the rename by hand or audit what the script does, here's the 
 
 | Reference | Location | Replaced by script? |
 |-----------|----------|---------------------|
-| Module path | `go.mod:1`, all `*.go` imports, `Makefile` (ldflags), `build/Dockerfile` (ldflags), `.golangci.yml` (`goimports.local-prefixes`), `internal/handler/version.go` (tracer name) | ✓ module pass |
+| Module path | `go.mod:1`, all `*.go` imports, `Makefile` (ldflags), `build/Dockerfile` (ldflags), `.golangci.yml` (`goimports.local-prefixes`), `internal/service/version.go` (tracer name) | ✓ module pass |
 | Short name | `cmd/server/main.go:serviceName`, `Makefile` (docker tags, helm template), `chart/Chart.yaml`, `chart/templates/_helpers.tpl`, `chart/templates/*.yaml`, `chart/NOTES.txt`, `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `web/README.md`, `SKILL.md` | ✓ short-name pass |
 | Image repository | `chart/values.yaml` (`server.image.repository` = `<new-name>`, `web.image.repository` = `<new-name>-web`) | ✓ short-name pass (registry prefix by hand only if pushing to a remote) |
 | Author / copyright | `README.md` (© line), `chart/Chart.yaml` (`maintainers`) | ✗ manual — your name, not the project's |
@@ -279,7 +284,7 @@ make dev-stack-down                                         # stop when done
 
 What to look for:
 
-- **Log lines** include `trace_id` and `span_id` because `otelgin.Middleware` runs before `logging.Middleware()` in `cmd/server/main.go`. If you swap their order, you lose trace context in logs. The same chain also applies `handler.BodyLimit`; generated API routes add OAS validation after the common chain, while `/metrics` stays outside the OAS group.
+- **Log lines** include `trace_id` and `span_id` because `otelgin.Middleware` runs before `logging.Middleware()` in `cmd/server/main.go`. If you swap their order, you lose trace context in logs. The same chain also applies `middleware.BodyLimit`; generated API routes add OAS validation after the common chain, while `/metrics` stays outside the OAS group.
 - **Jaeger UI** shows the service with one server span per request.
 - **`trace_id` in logs matches the trace ID in Jaeger** — copy-paste to confirm.
 
@@ -312,7 +317,7 @@ db:
   log_sql: false                                # flip to true to log every SQL statement
 ```
 
-`*gorm.DB` is already wired into `handler.New(gdb)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`.
+`*gorm.DB` is already wired into `service.New(gdb)`, and the resulting service into `handler.New(svc)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`.
 
 ## Error codes — `internal/errcode`
 
@@ -452,9 +457,9 @@ If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a Dock
 
 Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The `internal/db/db_test.go` test does exactly this.
 
-### 14. Pass `*gorm.DB` via the handler constructor
+### 14. Pass `*gorm.DB` via the service constructor
 
-Don't reach for a package-level global `db.DB`. The template already wires `*gorm.DB` through `handler.New(gdb)`; keep that pattern. Keeps tests able to swap a sqlite memory DB.
+Don't reach for a package-level global `db.DB`. The template wires `*gorm.DB` through `service.New(gdb)` and hands the `*service.Service` to `handler.New(svc)`; keep that layering. Keeps tests able to swap a sqlite memory DB.
 
 ### 15. Missing `config.yaml` is **not** an error
 
@@ -469,9 +474,10 @@ The repo's `.golangci.yml` enables `forbidigo` with `analyze-types: true` and an
 ```bash
 # Edit spec/openapi.yaml, then:
 make gen
-# Implement new methods in internal/handler/
+# Implement business operations in internal/service/, then map them
+# to responses in internal/handler/
 make lint test
-git add spec/ internal/api/ pkg/api/ internal/handler/
+git add spec/ internal/api/ pkg/api/ internal/service/ internal/handler/
 git commit -m "feat(api): add /foo endpoint"
 ```
 

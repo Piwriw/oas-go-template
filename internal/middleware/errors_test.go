@@ -1,4 +1,4 @@
-package handler
+package middleware
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/errcode"
 )
 
-// decodeAPIError parses a recorded handler response into the public error schema.
+// decodeAPIError parses a recorded middleware response into the public error schema.
 func decodeAPIError(t *testing.T, rec *httptest.ResponseRecorder) api.Error {
 	t.Helper()
 	var body api.Error
@@ -24,11 +24,11 @@ func decodeAPIError(t *testing.T, rec *httptest.ResponseRecorder) api.Error {
 	return body
 }
 
-// TestStrictServerOptionsSanitizesInternalErrors verifies generated handler failures never expose private details.
-func TestStrictServerOptionsSanitizesInternalErrors(t *testing.T) {
+// TestStrictHandlerOptionsSanitizesInternalErrors verifies generated handler failures never expose private details.
+func TestStrictHandlerOptionsSanitizesInternalErrors(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	options := StrictServerOptions()
+	options := StrictHandlerOptions()
 	r.GET("/", func(c *gin.Context) {
 		options.HandlerErrorFunc(c, errors.New("database password leaked"))
 	})

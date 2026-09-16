@@ -1,5 +1,5 @@
 // Package main is the server entrypoint: load config, init logging, init otel,
-// wire gin + handler, serve HTTP.
+// wire gin + service + handler, serve HTTP.
 package main
 
 import (
@@ -29,6 +29,7 @@ import (
 	"github.com/piwriw/oas-go-template/internal/middleware"
 	oascontract "github.com/piwriw/oas-go-template/internal/oas"
 	"github.com/piwriw/oas-go-template/internal/otel"
+	"github.com/piwriw/oas-go-template/internal/service"
 	"github.com/piwriw/oas-go-template/internal/version"
 	specapi "github.com/piwriw/oas-go-template/pkg/api"
 )
@@ -102,8 +103,9 @@ func run(configPath string) error {
 
 // newHTTPServer wires protected API and metrics routes from the embedded contract and runtime dependencies.
 func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
-	h := handler.New(gdb)
-	strictHandler := internalapi.NewStrictHandlerWithOptions(h, nil, handler.StrictServerOptions())
+	svc := service.New(gdb)
+	h := handler.New(svc)
+	strictHandler := internalapi.NewStrictHandlerWithOptions(h, nil, middleware.StrictHandlerOptions())
 	swaggerSpec := openAPISpec()
 
 	r := gin.New()
@@ -112,8 +114,8 @@ func newHTTPServer(cfg *config.Config, gdb *gorm.DB) *http.Server {
 		ServiceName:  serviceName,
 		MaxBodyBytes: maxRequestBodyBytes,
 	})
-	r.NoRoute(handler.NoRoute)
-	r.NoMethod(handler.NoMethod)
+	r.NoRoute(middleware.NoRoute)
+	r.NoMethod(middleware.NoMethod)
 
 	// /metrics is intentionally NOT in spec/openapi.yaml and not configurable —
 	// it's an ops endpoint, not part of the API contract, and there's no good
@@ -153,7 +155,7 @@ func openAPISpec() (swaggerSpec *openapi3.T) {
 // openAPIValidator builds middleware that rejects requests outside the embedded API contract.
 func openAPIValidator(swaggerSpec *openapi3.T) gin.HandlerFunc {
 	return ginmiddleware.OapiRequestValidatorWithOptions(swaggerSpec, &ginmiddleware.Options{
-		ErrorHandler:          handler.OAPIValidationError,
+		ErrorHandler:          middleware.OAPIValidationError,
 		SilenceServersWarning: true,
 	})
 }

@@ -50,7 +50,7 @@ const (
 const Internal Code = 99001
 
 // Database-related codes (50xxx) — returned when a configured DB is
-// misbehaving or unreachable. See internal/handler/health.go:GetReady.
+// misbehaving or unreachable. See internal/service/health.go:Ready.
 const (
 	// Deprecated: an intentionally disabled database is not a readiness error.
 	// Keep this value reserved because public error codes must never be reused.

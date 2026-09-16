@@ -1,4 +1,4 @@
-package handler
+package middleware
 
 import (
 	"errors"
@@ -13,21 +13,29 @@ import (
 	"github.com/piwriw/oas-go-template/internal/logging"
 )
 
-// StrictServerOptions maps generated binding failures to the stable public API error schema.
-func StrictServerOptions() api.StrictGinServerOptions {
+// Stable public messages shared by the error responses below.
+const (
+	msgInvalidRequest      = "invalid request"
+	msgRequestBodyTooLarge = "request body too large"
+	msgRouteNotFound       = "route not found"
+	msgInternalError       = "internal server error"
+)
+
+// StrictHandlerOptions maps generated binding failures to the stable public API error schema.
+func StrictHandlerOptions() api.StrictGinServerOptions {
 	return api.StrictGinServerOptions{
 		RequestErrorHandlerFunc: func(c *gin.Context, err error) {
 			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-				writeError(c, http.StatusRequestEntityTooLarge, errcode.RequestBodyTooLarge, "request body too large", err)
+				writeError(c, http.StatusRequestEntityTooLarge, errcode.RequestBodyTooLarge, msgRequestBodyTooLarge, err)
 				return
 			}
-			writeError(c, http.StatusBadRequest, errcode.InvalidRequest, "invalid request", err)
+			writeError(c, http.StatusBadRequest, errcode.InvalidRequest, msgInvalidRequest, err)
 		},
 		HandlerErrorFunc: func(c *gin.Context, err error) {
-			writeError(c, http.StatusInternalServerError, errcode.Internal, "internal server error", err)
+			writeError(c, http.StatusInternalServerError, errcode.Internal, msgInternalError, err)
 		},
 		ResponseErrorHandlerFunc: func(c *gin.Context, err error) {
-			writeError(c, http.StatusInternalServerError, errcode.Internal, "internal server error", err)
+			writeError(c, http.StatusInternalServerError, errcode.Internal, msgInternalError, err)
 		},
 	}
 }
@@ -35,7 +43,7 @@ func StrictServerOptions() api.StrictGinServerOptions {
 // Recovery converts handler panics into sanitized API error responses.
 func Recovery() gin.HandlerFunc {
 	return gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, recovered any) {
-		writeError(c, http.StatusInternalServerError, errcode.Internal, "internal server error", fmt.Errorf("panic recovered: %v\n%s", recovered, debug.Stack()))
+		writeError(c, http.StatusInternalServerError, errcode.Internal, msgInternalError, fmt.Errorf("panic recovered: %v\n%s", recovered, debug.Stack()))
 	})
 }
 
@@ -47,7 +55,7 @@ func BodyLimit(maxBytes int64) gin.HandlerFunc {
 			return
 		}
 		if c.Request.ContentLength > maxBytes {
-			writeError(c, http.StatusRequestEntityTooLarge, errcode.RequestBodyTooLarge, "request body too large", fmt.Errorf("content length %d exceeds limit %d", c.Request.ContentLength, maxBytes))
+			writeError(c, http.StatusRequestEntityTooLarge, errcode.RequestBodyTooLarge, msgRequestBodyTooLarge, fmt.Errorf("content length %d exceeds limit %d", c.Request.ContentLength, maxBytes))
 			return
 		}
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
@@ -58,17 +66,17 @@ func BodyLimit(maxBytes int64) gin.HandlerFunc {
 // OAPIValidationError sanitizes OpenAPI request validation failures for API callers.
 func OAPIValidationError(c *gin.Context, message string, statusCode int) {
 	code := errcode.InvalidRequest
-	publicMessage := "invalid request"
+	publicMessage := msgInvalidRequest
 	if statusCode == http.StatusNotFound {
 		code = errcode.NotFound
-		publicMessage = "route not found"
+		publicMessage = msgRouteNotFound
 	}
 	writeError(c, statusCode, code, publicMessage, errors.New(message))
 }
 
 // NoRoute writes the common 404 response for paths outside the API contract.
 func NoRoute(c *gin.Context) {
-	writeError(c, http.StatusNotFound, errcode.NotFound, "route not found", fmt.Errorf("%s %s", c.Request.Method, c.Request.URL.Path))
+	writeError(c, http.StatusNotFound, errcode.NotFound, msgRouteNotFound, fmt.Errorf("%s %s", c.Request.Method, c.Request.URL.Path))
 }
 
 // NoMethod writes the common 405 response. Gin has already populated Allow.

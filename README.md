@@ -10,7 +10,7 @@ English | **[简体中文](README.zh-CN.md)**
 A Go project template where **`spec/openapi.yaml` is the single source of truth**.
 Server stubs and the client SDK are generated from it via
 [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) (StrictServerInterface
-mode). All other code (config, otel, logging, db, handlers, errcode) supports
+mode). All other code (config, otel, logging, db, service, handlers, errcode) supports
 that contract.
 
 Ships with: gin + strict-server codegen, gorm (opt-in), OTel traces+metrics
@@ -255,8 +255,8 @@ Once initialized, the dev loop is:
 
 1. Edit `spec/openapi.yaml`.
 2. Run `make gen` → regenerates `internal/api/*.gen.go` and `pkg/api/*.gen.go`.
-3. Implement business logic in `internal/handler/` — methods return typed
-   `ResponseObject` values (`api.GetFoo200JSONResponse`, etc.).
+3. Implement business logic in `internal/service/`; map it to typed
+   `ResponseObject` values in `internal/handler/` (`api.GetFoo200JSONResponse`, etc.).
 4. Run `make build && ./bin/server`.
 
 If a handler method is missing, the compile-time assertion

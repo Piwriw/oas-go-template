@@ -7,7 +7,7 @@
 
 **[English](README.md)** | 简体中文
 
-一个 Go 项目模板，**以 `spec/openapi.yaml` 为唯一事实来源**。服务端 stub 和客户端 SDK 通过 [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen)（StrictServerInterface 模式）从 OAS 自动生成。所有其它代码（config、otel、logging、db、handler、errcode）都是为这份契约服务的辅助层。
+一个 Go 项目模板，**以 `spec/openapi.yaml` 为唯一事实来源**。服务端 stub 和客户端 SDK 通过 [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen)（StrictServerInterface 模式）从 OAS 自动生成。所有其它代码（config、otel、logging、db、service、handler、errcode）都是为这份契约服务的辅助层。
 
 开箱即用：gin + strict-server 代码生成、Gorm（可选）、OpenTelemetry traces+metrics（OTLP 推送 + Prometheus 拉取）、带 trace_id 注入的 slog、Dockerfile、Helm chart、golangci-lint v2 配置，以及独立部署的 Next.js + React + TS 前端。
 
@@ -212,7 +212,7 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 
 1. 编辑 `spec/openapi.yaml`。
 2. 跑 `make gen` → 重新生成 `internal/api/*.gen.go` 和 `pkg/api/*.gen.go`。
-3. 在 `internal/handler/` 实现业务逻辑——方法返回有类型的 `ResponseObject`（如 `api.GetFoo200JSONResponse`）。
+3. 在 `internal/service/` 实现业务逻辑，并在 `internal/handler/` 将其映射为有类型的 `ResponseObject`（如 `api.GetFoo200JSONResponse`）。
 4. 跑 `make build && ./bin/server`。
 
 如果漏写了某个 handler 方法，`internal/handler/handler_test.go` 里的编译期断言 `var _ api.StrictServerInterface = (*Handler)(nil)` 会让构建失败，并列出所有缺失的方法。
