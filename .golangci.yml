@@ -25,7 +25,6 @@ linters:
     - unparam          # unused function parameters / return values
     - misspell
     - forbidigo        # forbid specific calls — here, the legacy log package
-    -
   settings:
     gocyclo:
       min-complexity: 15   # default 30; Prometheus=10, Kubernetes=20 — pick a middle ground
