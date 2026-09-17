@@ -107,7 +107,8 @@ walkthrough.
 For a project you've already initialized (or to explore the template itself):
 
 ```bash
-make gen       # regenerate *.gen.go (pinned oapi-codegen v2.7.1)
+make gen       # regenerate Go *.gen.go (pinned oapi-codegen v2.7.1)
+make gen-web   # regenerate the TypeScript client in web/src/api (run npm ci in web/ first)
 make tools     # install air for optional local live reload
 make build     # build cmd/server into bin/
 make run       # go run cmd/server with version ldflags
@@ -267,7 +268,7 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 Once initialized, the dev loop is:
 
 1. Edit `spec/openapi.yaml`.
-2. Run `make gen` → regenerates `internal/api/*.gen.go` and `pkg/api/*.gen.go`.
+2. Run `make gen` → regenerates `internal/api/*.gen.go` and `pkg/api/*.gen.go`. Run `make gen-web` for the TypeScript client in `web/src/api/`; `make gen-all` does both.
 3. Implement business logic in `internal/service/`; map it to typed
    `ResponseObject` values in `internal/handler/` (`api.GetFoo200JSONResponse`, etc.).
 4. Run `make build && ./bin/server`.

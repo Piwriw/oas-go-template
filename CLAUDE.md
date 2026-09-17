@@ -12,7 +12,9 @@ For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md i
 
 | Task | Command |
 |------|---------|
-| Regenerate code from `spec/openapi.yaml` | `make gen` |
+| Regenerate backend code from `spec/openapi.yaml` | `make gen` |
+| Regenerate frontend API client | `make gen-web` |
+| Regenerate both | `make gen-all` |
 | Build server | `make build` |
 | Run server (with ldflags) | `make run` |
 | Run all tests | `make test` |
@@ -115,7 +117,9 @@ separate shutdown state or drain delay. Keep the Helm
 
 ### Frontend is independent
 
-`web/` (Next.js + React + TS) deploys separately from the server as a static export. `web/Dockerfile` is multi-stage (node build → nginx-unprivileged on `:8080`); backend runs on `:8000`. The server does **not** serve `web/out`. There is no typed client generated into `web/src/api/` — that's intentional (left for the user's stack choice).
+`web/` (Next.js + React + TS) deploys separately from the server as a static export. `web/Dockerfile` is multi-stage (node build → nginx-unprivileged on `:8080`); backend runs on `:8000`. The server does **not** serve `web/out`.
+
+`make gen-web` generates `web/src/api/schema.gen.ts` from the same `spec/openapi.yaml` using `openapi-typescript` (pinned in `web/package.json`; run `npm ci` in `web/` first). That file is committed like `*.gen.go` — **never hand-edit it** — and carries *types only*. The runtime client is the hand-written `web/src/api/client.ts`, which owns the `createClient<paths>()` instance from `openapi-fetch`; unlike a generator that emits the client for you, that file is yours to edit (base URL, middleware, auth). `openapi-typescript`'s TypeScript peer is `^5.x`, so `web/` is pinned to TS 5.x — bumping `web/` to TS 6 makes `npm ci` fail with `ERESOLVE`.
 
 ### Developer tool management
 

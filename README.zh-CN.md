@@ -92,7 +92,8 @@ author 的值再继续。
 针对已经初始化的项目（或仅想体验模板本身）：
 
 ```bash
-make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go（固定 oapi-codegen v2.7.1）
+make gen       # 从 spec/openapi.yaml 重新生成 Go 侧 *.gen.go（固定 oapi-codegen v2.7.1）
+make gen-web   # 重新生成 web/src/api 下的 TypeScript client（需先在 web/ 执行 npm ci）
 make tools     # 安装可选的本地热重载工具 air
 make build     # 编译 cmd/server 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server
@@ -223,7 +224,7 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 项目初始化后，开发循环是：
 
 1. 编辑 `spec/openapi.yaml`。
-2. 跑 `make gen` → 重新生成 `internal/api/*.gen.go` 和 `pkg/api/*.gen.go`。
+2. 跑 `make gen` → 重新生成 `internal/api/*.gen.go` 和 `pkg/api/*.gen.go`。前端 TypeScript client 用 `make gen-web` 生成到 `web/src/api/`；`make gen-all` 一次执行两者。
 3. 在 `internal/service/` 实现业务逻辑，并在 `internal/handler/` 将其映射为有类型的 `ResponseObject`（如 `api.GetFoo200JSONResponse`）。
 4. 跑 `make build && ./bin/server`。
 

@@ -29,7 +29,18 @@ The Docker image uses the static `out/` export and serves it on port `8080`.
 
 ## API Client
 
-The frontend OAS client is intentionally not included in this template. If
-needed, generate a TypeScript client from `../spec/openapi.yaml` with
-`openapi-typescript` and/or `openapi-fetch`, placing generated files under
-`src/api/`.
+`src/api/schema.gen.ts` is generated from `../spec/openapi.yaml` by
+`openapi-typescript` — run `make gen-web` from the repo root. It holds **types
+only**; never hand-edit it.
+
+The runtime client is `src/api/client.ts`, a hand-written `openapi-fetch`
+instance typed against those paths. It defaults to `http://localhost:8000`;
+set `NEXT_PUBLIC_API_BASE_URL` at build time to point elsewhere. Next inlines
+`NEXT_PUBLIC_*` into the bundle, so this is fixed at build time and cannot be
+changed by restarting the container.
+
+```ts
+import { client } from './api/client'
+
+const { data, error } = await client.GET('/version')
+```

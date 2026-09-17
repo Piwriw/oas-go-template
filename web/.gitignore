@@ -12,6 +12,9 @@ node_modules
 out
 *.local
 
+# TypeScript incremental build info (tsc --noEmit / next build)
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

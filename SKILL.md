@@ -246,7 +246,7 @@ If you'd rather do the rename by hand or audit what the script does, here's the 
 | Short name | `cmd/server/main.go:serviceName`, `Makefile` (docker tags, helm template), `chart/Chart.yaml`, `chart/templates/_helpers.tpl`, `chart/templates/*.yaml`, `chart/NOTES.txt`, `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `web/README.md`, `SKILL.md` | ✓ short-name pass |
 | Image repository | `chart/values.yaml` (`server.image.repository` = `<new-name>`, `web.image.repository` = `<new-name>-web`) | ✓ short-name pass (registry prefix by hand only if pushing to a remote) |
 | Author / copyright | `README.md` (© line), `chart/Chart.yaml` (`maintainers`) | ✗ manual — your name, not the project's |
-| Generated code | `internal/api/*.gen.go`, `pkg/api/*.gen.go` | refreshed by `make gen` (skipped by sed) |
+| Generated code | `internal/api/*.gen.go`, `pkg/api/*.gen.go`, `web/src/api/*.gen.ts` | refreshed by `make gen` / `make gen-web` (skipped by sed) |
 
 The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile Dockerfile *.sh *.md *.tpl *.txt go.mod go.sum`. Anything outside that set won't be touched.
 
@@ -254,7 +254,9 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 
 | Target | What |
 |--------|------|
-| `make gen` | Regenerate `*.gen.go` from `spec/openapi.yaml` |
+| `make gen` | Regenerate backend `*.gen.go` from `spec/openapi.yaml` |
+| `make gen-web` | Regenerate the TypeScript API client in `web/src/api/` |
+| `make gen-all` | Regenerate backend and frontend together |
 | `make build` | Build `bin/server` (with version ldflags) |
 | `make run` | `go run` server (with ldflags) |
 | `make migrate-up` | Apply all pending DB migrations from `CONFIG` (default `config.yaml`) |
@@ -439,7 +441,7 @@ If you reach for `os.Exit(0)` at the end of `main`, gocritic flags `exitAfterDef
 
 ### 10. Generated code must be checked in, not gitignored
 
-`*.gen.go` files are committed to git. They are stable across runs (`make gen` is idempotent — verified by `git status` being clean afterwards). Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled.
+`*.gen.go` files are committed to git. They are stable across runs (`make gen` is idempotent — verified by `git status` being clean afterwards). Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output.
 
 ### 11. Middleware order: `otelgin` BEFORE `logging`
 
@@ -485,15 +487,26 @@ git commit -m "feat(api): add /foo endpoint"
 
 ## Frontend ↔ Backend Contract
 
-The frontend (`web/`) is **independent** — server doesn't serve its static files. If you want a typed TypeScript client matching `spec/openapi.yaml`, the template intentionally leaves `web/src/api/` empty. Add this yourself with `openapi-typescript` and/or `openapi-fetch`:
+The frontend (`web/`) is **independent** — the server doesn't serve its static files.
+
+`make gen-web` generates `web/src/api/schema.gen.ts` from the same `spec/openapi.yaml`, using `openapi-typescript` (pinned in `web/package.json`):
 
 ```bash
-cd web
-npm install openapi-fetch openapi-typescript
-npx openapi-typescript ../spec/openapi.yaml -o src/api/schema.gen.ts
+cd web && npm ci     # once
+make gen-web         # regenerate after editing spec/openapi.yaml
 ```
 
-(Not part of the template — left as an exercise because everyone's frontend stack differs.)
+The generator emits **types only** — `paths`, `operations`, and `components`. The runtime client is hand-written in `web/src/api/client.ts`, which owns the `createClient<paths>()` instance from `openapi-fetch` (a real runtime dependency, not vendored):
+
+```ts
+import { client } from '../api/client'
+
+const { data, error } = await client.GET('/healthz')
+```
+
+Routes and methods come from the spec, so a typo'd path is a compile error, and `data` / `error` are narrowed per response status. `schema.gen.ts` is committed, like `*.gen.go`. **Never hand-edit it** — edit `spec/openapi.yaml` and re-run `make gen-web`. `client.ts` is yours to edit (base URL, middleware, auth).
+
+`openapi-typescript`'s TypeScript peer is `^5.x`, so `web/` stays on TS 5.x — moving `web/` to TS 6 makes `npm ci` fail with `ERESOLVE`.
 
 ## License
 
