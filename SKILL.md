@@ -257,6 +257,8 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 | `make gen` | Regenerate `*.gen.go` from `spec/openapi.yaml` |
 | `make build` | Build `bin/server` (with version ldflags) |
 | `make run` | `go run` server (with ldflags) |
+| `make migrate-up` | Apply all pending DB migrations from `CONFIG` (default `config.yaml`) |
+| `make migrate-down` | Roll back exactly one DB migration from `CONFIG` |
 | `make test` | `go test -race -cover ./...` |
 | `make lint` | Official `golangci-lint` binary, `golangci-lint run` (v2) |
 | `make lint-config` | Verify the golangci-lint v2 configuration |
@@ -317,7 +319,7 @@ db:
   log_sql: false                                # flip to true to log every SQL statement
 ```
 
-`*gorm.DB` is already wired into `service.New(gdb)`, and the resulting service into `handler.New(svc)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`.
+`*gorm.DB` is already wired into `service.New(gdb)`, and the resulting service into `handler.New(svc)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`. They also run on demand through the dedicated `cmd/migrate` entrypoint: `make migrate-up` applies all pending versions and `make migrate-down` rolls back exactly one, using the DSN from `CONFIG`.
 
 ## Error codes — `internal/errcode`
 

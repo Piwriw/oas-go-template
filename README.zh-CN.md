@@ -96,6 +96,7 @@ make gen       # 从 spec/openapi.yaml 重新生成 *.gen.go（固定 oapi-codeg
 make tools     # 安装可选的本地热重载工具 air
 make build     # 编译 cmd/server 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server
+make migrate-up / migrate-down   # 应用待执行迁移 / 回退一个版本（可覆盖 CONFIG）
 make test      # go test -race -cover ./...
 make lint      # golangci-lint v2（排除 *.gen.go，禁止 legacy log 包）
 make audit     # govulncheck v1.6.0 + gosec v2.27.1（CI 门禁）
@@ -175,6 +176,17 @@ page, err := db.Paginate[User](ctx,
 已执行版本。不要修改或复用已执行的版本，每个 `down` 文件必须撤销对应 `up`
 文件的变更。时间戳不合法、缺少 up/down 配对、迁移失败或数据库处于 dirty 状态
 都会阻止服务启动，避免服务运行在不确定的表结构上。
+
+无需启动 HTTP 服务也可以执行同一组嵌入式迁移：
+
+```bash
+make migrate-up                         # 应用全部待执行迁移
+make migrate-down                       # 固定回退一个迁移版本
+make migrate-up CONFIG=/etc/app/prod.yaml
+```
+
+两个 target 都从 `CONFIG`（默认 `config.yaml`）读取数据库 DSN。迁移目录没有
+SQL 文件时会成功退出，因此刚初始化、尚未创建第一个表的项目也能直接使用这些命令。
 
 ## 本地可观测性栈
 

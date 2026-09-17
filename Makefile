@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen tools contract-check supply-chain-check build run test lint lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen tools contract-check supply-chain-check build run migrate-up migrate-down test lint lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -22,6 +22,9 @@ OASDIFF_VERSION ?= v1.10.28
 # the default makes the target a useful no-op smoke check.
 BASE_SPEC ?= spec/openapi.yaml
 
+# Manual database migrations read the same config as the server.
+CONFIG ?= config.yaml
+
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
@@ -43,6 +46,12 @@ build:  ## Build server binary into ./bin (with version ldflags)
 
 run:  ## Run server locally (with version ldflags)
 	go run -ldflags "$(LDFLAGS)" ./cmd/server
+
+migrate-up: ## Apply all pending database migrations from CONFIG
+	go run ./cmd/migrate -c "$(CONFIG)" up
+
+migrate-down: ## Roll back one database migration from CONFIG
+	go run ./cmd/migrate -c "$(CONFIG)" down
 
 test:  ## Run all tests
 	go test -race -cover ./...

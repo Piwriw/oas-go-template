@@ -111,6 +111,7 @@ make gen       # regenerate *.gen.go (pinned oapi-codegen v2.7.1)
 make tools     # install air for optional local live reload
 make build     # build cmd/server into bin/
 make run       # go run cmd/server with version ldflags
+make migrate-up / migrate-down   # apply pending migrations / roll back one (override CONFIG)
 make test      # go test -race -cover ./...
 make lint      # golangci-lint v2 (excludes *.gen.go, forbids legacy log)
 make audit     # govulncheck v1.6.0 + gosec v2.27.1 (CI gate)
@@ -207,6 +208,18 @@ reuse an applied version, and make each `down` file reverse its matching `up`
 file. Invalid timestamps, missing direction pairs, migration failures, and a
 dirty database all stop server startup instead of serving against an uncertain
 schema.
+
+Run the same embedded migrations without starting the HTTP server:
+
+```bash
+make migrate-up                         # apply every pending migration
+make migrate-down                       # roll back exactly one migration
+make migrate-up CONFIG=/etc/app/prod.yaml
+```
+
+Both targets use the database DSN from `CONFIG` (default `config.yaml`). An empty
+migration directory is a successful no-op, which keeps a newly initialized
+project usable before its first schema change.
 
 ## Local Observability Stack
 

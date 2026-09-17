@@ -21,7 +21,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// MigrationDirection selects whether schema migrations advance or roll back.
+type MigrationDirection string
+
 const (
+	// MigrationUp applies every pending migration.
+	MigrationUp MigrationDirection = "up"
+	// MigrationDown rolls back exactly one applied migration.
+	MigrationDown MigrationDirection = "down"
+
 	migrationDirectory     = "migrations"
 	migrationTableName     = "schema_migrations"
 	migrationVersionLayout = "20060102150405"
@@ -34,22 +42,28 @@ const (
 //go:embed migrations
 var migrationFiles embed.FS
 
-// Migrate applies pending embedded schema changes for an enabled database.
-func Migrate(ctx context.Context, gdb *gorm.DB, cfg Config) error {
+// Migrate applies embedded schema changes in the requested direction.
+func Migrate(ctx context.Context, gdb *gorm.DB, cfg Config, direction MigrationDirection) error {
 	if cfg.Disabled() {
 		return nil
 	}
-	if gdb == nil {
-		return errors.New("migration database is nil")
-	}
-	return runMigrations(ctx, gdb, cfg, migrationFiles)
+	return runMigrations(ctx, gdb, cfg, direction, migrationFiles)
 }
 
-// runMigrations validates a migration source and advances the database to its latest version.
-func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, migrationFS fs.FS) (err error) {
+// runMigrations validates and executes the requested embedded migration operation.
+func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, direction MigrationDirection, migrationFS fs.FS) (err error) {
+	switch direction {
+	case MigrationUp, MigrationDown:
+	default:
+		return fmt.Errorf("unsupported migration direction %q (want up|down)", direction)
+	}
+
 	hasMigrations, err := validateMigrationFiles(migrationFS)
 	if err != nil {
 		return err
+	}
+	if !hasMigrations && gdb == nil {
+		return nil
 	}
 
 	sourceDriver, err := iofs.New(migrationFS, migrationDirectory)
@@ -57,7 +71,7 @@ func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, migrationFS fs
 		return fmt.Errorf("open migration files: %w", err)
 	}
 
-	databaseDriver, driverName, err := newMigrationDatabase(gdb, cfg)
+	databaseDriver, driverName, err := newMigrationDatabase(ctx, gdb, cfg)
 	if err != nil {
 		return errors.Join(err, closeMigrationSource(sourceDriver))
 	}
@@ -86,8 +100,8 @@ func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, migrationFS fs
 	})
 	defer stopCancellation()
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("apply migrations: %w", err)
+	if err := applyDirection(migrator, direction); err != nil {
+		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("migration interrupted: %w", err)
@@ -95,78 +109,132 @@ func runMigrations(ctx context.Context, gdb *gorm.DB, cfg Config, migrationFS fs
 	return nil
 }
 
-// newMigrationDatabase adapts the active Gorm connection for the configured migration driver.
-func newMigrationDatabase(gdb *gorm.DB, cfg Config) (migratedatabase.Driver, string, error) {
-	driverName, dsn, err := migrationConnectionConfig(cfg)
+// applyDirection advances or rolls back the schema through the prepared migrator.
+func applyDirection(migrator *migrate.Migrate, direction MigrationDirection) error {
+	switch direction {
+	case MigrationUp:
+		if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("apply migrations: %w", err)
+		}
+	case MigrationDown:
+		if _, _, err := migrator.Version(); errors.Is(err, migrate.ErrNilVersion) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("read migration version: %w", err)
+		}
+		if err := migrator.Steps(-1); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("roll back migration: %w", err)
+		}
+	}
+	return nil
+}
+
+// newMigrationDatabase opens and adapts the configured connection for schema
+// migrations. Supporting another database means adding one case and one function.
+func newMigrationDatabase(ctx context.Context, gdb *gorm.DB, cfg Config) (migratedatabase.Driver, string, error) {
+	switch cfg.Driver {
+	case "postgres", "postgresql", "pg":
+		return pgxMigrationDatabase(ctx, cfg.DSN)
+	case "mysql":
+		return mysqlMigrationDatabase(ctx, cfg.DSN)
+	case "sqlite", "sqlite3":
+		return sqliteMigrationDatabase(ctx, gdb, cfg.DSN)
+	default:
+		return nil, "", fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.Driver)
+	}
+}
+
+// pgxMigrationDatabase dials PostgreSQL for golang-migrate through the pgx/v5 adapter.
+func pgxMigrationDatabase(ctx context.Context, dsn string) (migratedatabase.Driver, string, error) {
+	sqlDB, err := openMigrationDB(ctx, migrationDriverPostgres, dsn)
 	if err != nil {
 		return nil, "", err
 	}
+	driver, err := migratepgx.WithInstance(sqlDB, &migratepgx.Config{
+		MigrationsTable: migrationTableName,
+	})
+	if err != nil {
+		return nil, "", errors.Join(fmt.Errorf("initialize migration database: %w", err), sqlDB.Close())
+	}
+	return driver, migrationDriverPostgres, nil
+}
 
-	if driverName == migrationDriverSQLite {
+// mysqlMigrationDatabase dials MySQL with multi-statement support enabled so one
+// migration file may hold several statements.
+func mysqlMigrationDatabase(ctx context.Context, dsn string) (migratedatabase.Driver, string, error) {
+	mysqlConfig, err := mysqldriver.ParseDSN(dsn)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse mysql migration DSN: %w", err)
+	}
+	mysqlConfig.MultiStatements = true
+
+	sqlDB, err := openMigrationDB(ctx, migrationDriverMySQL, mysqlConfig.FormatDSN())
+	if err != nil {
+		return nil, "", err
+	}
+	driver, err := migratemysql.WithInstance(sqlDB, &migratemysql.Config{
+		MigrationsTable: migrationTableName,
+	})
+	if err != nil {
+		return nil, "", errors.Join(fmt.Errorf("initialize migration database: %w", err), sqlDB.Close())
+	}
+	return driver, migrationDriverMySQL, nil
+}
+
+// sqliteMigrationDatabase reuses the application connection when there is one,
+// because a private connection would not see the same database — and an
+// in-memory DSN would get a second, empty one. Only a standalone migrator dials
+// the DSN itself, and it must not close the application's connection.
+func sqliteMigrationDatabase(ctx context.Context, gdb *gorm.DB, dsn string) (migratedatabase.Driver, string, error) {
+	if gdb != nil {
 		sqlDB, err := gdb.DB()
 		if err != nil {
 			return nil, "", fmt.Errorf("get sqlite migration database: %w", err)
 		}
-		databaseDriver, err := migratesqlite.WithInstance(sqlDB, &migratesqlite.Config{
+		driver, err := migratesqlite.WithInstance(sqlDB, &migratesqlite.Config{
 			MigrationsTable: migrationTableName,
 		})
 		if err != nil {
 			return nil, "", fmt.Errorf("initialize migration database: %w", err)
 		}
-		return nonClosingMigrationDriver{Driver: databaseDriver}, driverName, nil
+		return nonClosingMigrationDriver{Driver: driver}, migrationDriverSQLite, nil
 	}
 
-	sqlDB, err := sql.Open(driverName, dsn)
+	sqlDB, err := openMigrationDB(ctx, migrationDriverSQLite, dsn)
 	if err != nil {
-		return nil, "", fmt.Errorf("open migration database: %w", err)
+		return nil, "", err
 	}
-
-	var databaseDriver migratedatabase.Driver
-	switch driverName {
-	case migrationDriverPostgres:
-		databaseDriver, err = migratepgx.WithInstance(sqlDB, &migratepgx.Config{
-			MigrationsTable: migrationTableName,
-		})
-	case migrationDriverMySQL:
-		databaseDriver, err = migratemysql.WithInstance(sqlDB, &migratemysql.Config{
-			MigrationsTable: migrationTableName,
-		})
-	default:
-		err = fmt.Errorf("unsupported migration driver %q", driverName)
-	}
+	driver, err := migratesqlite.WithInstance(sqlDB, &migratesqlite.Config{
+		MigrationsTable: migrationTableName,
+	})
 	if err != nil {
 		return nil, "", errors.Join(fmt.Errorf("initialize migration database: %w", err), sqlDB.Close())
 	}
-	return databaseDriver, driverName, nil
+	return driver, migrationDriverSQLite, nil
 }
 
-// nonClosingMigrationDriver lets golang-migrate reuse the application's
-// SQLite connection without closing it when the short-lived migrator closes.
+// openMigrationDB dials a migration-only connection and verifies it is reachable.
+func openMigrationDB(ctx context.Context, driverName, dsn string) (*sql.DB, error) {
+	sqlDB, err := sql.Open(driverName, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open migration database: %w", err)
+	}
+
+	pingCtx, cancel := context.WithTimeout(ctx, databasePingTimeout)
+	defer cancel()
+	if err := sqlDB.PingContext(pingCtx); err != nil {
+		return nil, errors.Join(fmt.Errorf("migration database ping: %w", err), sqlDB.Close())
+	}
+	return sqlDB, nil
+}
+
+// nonClosingMigrationDriver lets golang-migrate reuse the application's SQLite connection without closing it.
 type nonClosingMigrationDriver struct {
 	migratedatabase.Driver
 }
 
 // Close preserves the application-owned database connection when migrations release their driver.
 func (nonClosingMigrationDriver) Close() error { return nil }
-
-// migrationConnectionConfig normalizes database aliases and DSNs for the migration library.
-func migrationConnectionConfig(cfg Config) (driverName, dsn string, err error) {
-	switch cfg.Driver {
-	case "postgres", "postgresql", "pg":
-		return migrationDriverPostgres, cfg.DSN, nil
-	case "mysql":
-		mysqlConfig, parseErr := mysqldriver.ParseDSN(cfg.DSN)
-		if parseErr != nil {
-			return "", "", fmt.Errorf("parse mysql migration DSN: %w", parseErr)
-		}
-		mysqlConfig.MultiStatements = true
-		return migrationDriverMySQL, mysqlConfig.FormatDSN(), nil
-	case "sqlite", "sqlite3":
-		return migrationDriverSQLite, cfg.DSN, nil
-	default:
-		return "", "", fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.Driver)
-	}
-}
 
 // validateMigrationFiles ensures every embedded migration version has one up and one down script.
 func validateMigrationFiles(migrationFS fs.FS) (bool, error) {
@@ -185,7 +253,7 @@ func validateMigrationFiles(migrationFS fs.FS) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("invalid migration filename %q: %w", entry.Name(), err)
 		}
-		version := strings.SplitN(entry.Name(), "_", 2)[0]
+		version, _, _ := strings.Cut(entry.Name(), "_")
 		if _, err := time.Parse(migrationVersionLayout, version); err != nil {
 			return false, fmt.Errorf("invalid migration timestamp %q in %q: %w", version, entry.Name(), err)
 		}

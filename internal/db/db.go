@@ -28,6 +28,8 @@ import (
 	gormotel "gorm.io/plugin/opentelemetry/tracing"
 )
 
+const databasePingTimeout = 5 * time.Second
+
 // Config holds database configuration. Loaded from config.yaml by the
 // config package; defaults are filled in by config.Load before this struct
 // reaches db.Init.
@@ -89,12 +91,12 @@ func Init(ctx context.Context, cfg Config) (*gorm.DB, error) {
 
 	// Use a fresh timeout for the ping so a long-lived caller ctx (e.g. the
 	// server's signal-aware ctx) doesn't make startup hang on an unreachable DB.
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, databasePingTimeout)
 	defer cancel()
 	if err := sqlDB.PingContext(pingCtx); err != nil {
 		return nil, fmt.Errorf("db ping: %w", err)
 	}
-	if err := Migrate(ctx, gdb, cfg); err != nil {
+	if err := Migrate(ctx, gdb, cfg, MigrationUp); err != nil {
 		return nil, fmt.Errorf("db migrate: %w", err)
 	}
 

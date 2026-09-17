@@ -90,11 +90,9 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 ### DB (Gorm, opt-in)
 
-`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout.
+`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout. Migrations run automatically at startup; `make migrate-up` applies pending migrations manually and `make migrate-down` rolls back exactly one version using the DSN from `CONFIG` (default `config.yaml`).
 
 `*gorm.DB` is injected via `service.New(gdb)` and the service via `handler.New(svc)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
-
-For sqlite tests use `file::memory:?cache=shared` + `DB_MAX_OPEN_CONNS=1` — see `internal/db/db_test.go`. With a connection pool, each connection otherwise gets its own private memory DB.
 
 ### /healthz vs /readyz
 
@@ -132,6 +130,7 @@ for optional local live reload.
 ## Watch-outs
 
 - **Test behavior, not plumbing**: do not add unit tests that merely re-verify Go standard-library or third-party behavior, or straightforward field-to-option assignments. For configuration switches, cover built-in defaults and explicit YAML overrides at the `config.Load` boundary; add deeper behavior tests only when the project implements custom branching, transformation, or failure handling.
+- **Database code needs no tests**: `internal/db/` and its subpackages (`models/`, `store/`) carry no unit tests — do not add or restore test files there. The package is thin plumbing over gorm and golang-migrate; reachability is covered by `/readyz`, and DB behavior is verified against real environments instead of unit tests.
 - **Database model field comments**: every field in a non-generated persistent database model must have a concise comment line immediately above the field declaration. The comment must describe the field's business meaning; trailing comments do not satisfy this requirement. Never edit `*.gen.go` to add these comments.
 - **Named constants without over-extraction**: values that are reused or define business/protocol invariants (route paths, context keys, header names, etc.) belong in a named `const` block immediately after the imports. Do not extract one-off SQL fragments, column names, sort expressions, or other local implementation details merely to avoid literals; keep them at the call site and prefer typed library APIs that eliminate repeated strings. Repeated values used across `switch` cases or conditionals still require named constants.
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.
