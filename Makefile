@@ -11,8 +11,8 @@ LDFLAGS     := -X $(VERSION_PKG).Version=$(VERSION) \
                -X $(VERSION_PKG).GitCommit=$(GIT_COMMIT) \
                -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
 
-# Go-managed tool versions live in go.mod. Keep tools that intentionally run
-# outside the application module graph pinned here.
+# The generator is pinned in tools/go.mod; goimports and govulncheck in go.mod.
+# Other tools run outside the application module graph at the versions below.
 GOLANGCI_LINT_VERSION ?= 2.12.2
 GOSEC_VERSION ?= v2.27.1
 AIR_VERSION ?= v1.66.0
@@ -42,7 +42,7 @@ contract-check:  ## Reject breaking OpenAPI changes against BASE_SPEC
 supply-chain-check:  ## Verify Go, tool, Docker image, and GitHub Action pins
 	./scripts/verify-pins.sh
 
-tools:  ## Install pinned local-only tools (Go tools run directly from go.mod)
+tools:  ## Install pinned air for optional local live reload
 	go install github.com/air-verse/air@$(AIR_VERSION)
 
 build:  ## Build server binary into ./bin (with version ldflags)

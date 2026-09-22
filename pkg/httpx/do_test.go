@@ -62,7 +62,7 @@ func TestDo_Get_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	out, err := Do[echoResp](context.Background(), c, http.MethodGet, srv.URL, nil)
+	out, err := c.Do[echoResp](context.Background(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatalf("Do err: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestDo_Get_204_NoBody(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	out, err := Do[echoResp](context.Background(), c, http.MethodGet, srv.URL, nil)
+	out, err := c.Do[echoResp](context.Background(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatalf("Do err: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestDo_Post_RequestBody(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	out, err := Do[echoResp](context.Background(), c, http.MethodPost, srv.URL, map[string]any{"k": "v"})
+	out, err := c.Do[echoResp](context.Background(), http.MethodPost, srv.URL, map[string]any{"k": "v"})
 	if err != nil {
 		t.Fatalf("Do err: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestDo_Post_SetsContentType(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	_, err := Do[echoResp](context.Background(), c, http.MethodPost, srv.URL, map[string]any{"k": "v"})
+	_, err := c.Do[echoResp](context.Background(), http.MethodPost, srv.URL, map[string]any{"k": "v"})
 	if err != nil {
 		t.Fatalf("Do err: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestDo_Non2xx_ReturnsErrNon2xx(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	_, err := Do[echoResp](context.Background(), c, http.MethodGet, srv.URL, nil)
+	_, err := c.Do[echoResp](context.Background(), http.MethodGet, srv.URL, nil)
 	if err == nil {
 		t.Fatal("want err, got nil")
 	}
@@ -161,7 +161,7 @@ func TestDo_NetworkError(t *testing.T) {
 	c := New()
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	srv.Close()
-	_, err := Do[echoResp](context.Background(), c, http.MethodGet, srv.URL, nil)
+	_, err := c.Do[echoResp](context.Background(), http.MethodGet, srv.URL, nil)
 	if err == nil {
 		t.Fatal("want err, got nil")
 	}
@@ -181,7 +181,7 @@ func TestDo_BaseURL_Joined(t *testing.T) {
 	defer srv.Close()
 
 	c := New(WithBaseURL(srv.URL))
-	_, err := Do[echoResp](context.Background(), c, http.MethodGet, "/foo", nil)
+	_, err := c.Do[echoResp](context.Background(), http.MethodGet, "/foo", nil)
 	if err != nil {
 		t.Fatalf("Do err: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestDo_BodyTruncatedInError(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	_, err := Do[echoResp](context.Background(), c, http.MethodGet, srv.URL, nil)
+	_, err := c.Do[echoResp](context.Background(), http.MethodGet, srv.URL, nil)
 	if err == nil {
 		t.Fatal("want err")
 	}
@@ -219,7 +219,7 @@ func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	resp, err := DoVoid(context.Background(), c, http.MethodPost, srv.URL, map[string]any{"k": "v"})
+	resp, err := c.DoVoid(context.Background(), http.MethodPost, srv.URL, map[string]any{"k": "v"})
 	if err != nil {
 		t.Fatalf("DoVoid err: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestDoVoid_Non2xx_ReturnsErrNon2xx(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	resp, err := DoVoid(context.Background(), c, http.MethodPost, srv.URL, nil)
+	resp, err := c.DoVoid(context.Background(), http.MethodPost, srv.URL, nil)
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
 	}

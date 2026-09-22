@@ -34,7 +34,10 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 
 ### OAS-driven codegen (5 outputs, one spec)
 
-`scripts/gen.sh` invokes `oapi-codegen` five times against `spec/openapi.yaml`:
+`scripts/gen.sh` invokes the generator pinned in `tools/go.mod` five times
+against `spec/openapi.yaml`. The `spec/*.cfg.yaml` files select models, server,
+client, or embedded-spec generation; the script owns input and output paths.
+`models.cfg.yaml` is shared by the two model outputs:
 
 | Output | Package | Role |
 |--------|---------|------|
@@ -160,8 +163,13 @@ separate shutdown state or drain delay. Keep the Helm
 
 ### Developer tool management
 
-The `tool` block in `go.mod` pins `oapi-codegen`, `goimports`, and
-`govulncheck`; invoke them through `go tool`, not globally installed binaries.
+The `tool` directive in `tools/go.mod` pins `oapi-codegen`, isolating generator
+dependencies from the application. `make gen` runs it from that module with
+absolute input and output paths. The root `go.mod` still pins `goimports` and
+`govulncheck`; invoke these tools through `go tool`, not globally installed binaries.
+After dependency changes, tidy both modules with `go mod tidy` and
+`go -C tools mod tidy`. CI checks both modules and regenerates Go and TypeScript
+outputs with `make gen-all` to detect drift from the spec or generator configs.
 `golangci-lint` intentionally stays outside the application module graph:
 local development uses its official release binary and CI uses the official
 Action pinned to a commit SHA. `oasdiff` and `gosec` remain isolated behind

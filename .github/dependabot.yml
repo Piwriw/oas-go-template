@@ -4,7 +4,9 @@ version: 2
 # base images fresh. Derived projects inherit this config unchanged.
 updates:
   - package-ecosystem: gomod
-    directory: /
+    directories:
+      - /
+      - /tools
     schedule:
       interval: monthly
     open-pull-requests-limit: 5

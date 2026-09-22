@@ -78,7 +78,7 @@ func TestGet_Wrapper(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	out, err := Get[wrapper](context.Background(), c, srv.URL)
+	out, err := c.Get[wrapper](context.Background(), srv.URL)
 	if err != nil {
 		t.Fatalf("Get err: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestPost_Wrapper(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	out, err := Post[wrapper](context.Background(), c, srv.URL, wrapper{Field: "req"})
+	out, err := c.Post[wrapper](context.Background(), srv.URL, wrapper{Field: "req"})
 	if err != nil {
 		t.Fatalf("Post err: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestPut_Patch_Delete_Wrappers(t *testing.T) {
 	c := New()
 
 	gotMethod = ""
-	if _, err := Put[wrapper](context.Background(), c, srv.URL, wrapper{Field: "x"}); err != nil {
+	if _, err := c.Put[wrapper](context.Background(), srv.URL, wrapper{Field: "x"}); err != nil {
 		t.Fatalf("Put err: %v", err)
 	}
 	if gotMethod != http.MethodPut {
@@ -131,7 +131,7 @@ func TestPut_Patch_Delete_Wrappers(t *testing.T) {
 	}
 
 	gotMethod = ""
-	if _, err := Patch[wrapper](context.Background(), c, srv.URL, wrapper{Field: "x"}); err != nil {
+	if _, err := c.Patch[wrapper](context.Background(), srv.URL, wrapper{Field: "x"}); err != nil {
 		t.Fatalf("Patch err: %v", err)
 	}
 	if gotMethod != http.MethodPatch {
@@ -139,7 +139,7 @@ func TestPut_Patch_Delete_Wrappers(t *testing.T) {
 	}
 
 	gotMethod = ""
-	if _, err := Delete[wrapper](context.Background(), c, srv.URL); err != nil {
+	if _, err := c.Delete[wrapper](context.Background(), srv.URL); err != nil {
 		t.Fatalf("Delete err: %v", err)
 	}
 	if gotMethod != http.MethodDelete {
@@ -156,25 +156,25 @@ func TestPostVoid_Etc(t *testing.T) {
 
 	c := New()
 
-	resp, err := PostVoid(context.Background(), c, srv.URL, wrapper{Field: "x"})
+	resp, err := c.PostVoid(context.Background(), srv.URL, wrapper{Field: "x"})
 	if err != nil {
 		t.Fatalf("PostVoid err: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	resp, err = PutVoid(context.Background(), c, srv.URL, wrapper{Field: "x"})
+	resp, err = c.PutVoid(context.Background(), srv.URL, wrapper{Field: "x"})
 	if err != nil {
 		t.Fatalf("PutVoid err: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	resp, err = PatchVoid(context.Background(), c, srv.URL, wrapper{Field: "x"})
+	resp, err = c.PatchVoid(context.Background(), srv.URL, wrapper{Field: "x"})
 	if err != nil {
 		t.Fatalf("PatchVoid err: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	resp, err = DeleteVoid(context.Background(), c, srv.URL)
+	resp, err = c.DeleteVoid(context.Background(), srv.URL)
 	if err != nil {
 		t.Fatalf("DeleteVoid err: %v", err)
 	}

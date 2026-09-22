@@ -10,7 +10,7 @@ Requirements:
 
 - Go 1.26+
 - [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) v2.7.1 —
-  managed by `go.mod` and downloaded automatically by `go tool`
+  managed by `tools/go.mod` and downloaded automatically by `go tool`
 - An [official `golangci-lint` v2.12.2 binary](https://golangci-lint.run/docs/welcome/install/local/)
   for local linting; CI uses the same version through the official action
 - `make`, `docker`, `helm` (only for chart changes), Node 22+ (only for `web/`)
@@ -33,17 +33,21 @@ make audit      # govulncheck v1.6.0 + gosec v2.27.1
 ```
 
 Upgrade the generator deliberately with
-`go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@vX.Y.Z`,
-then regenerate and review all generated output in the same change.
+`go -C tools get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@vX.Y.Z`,
+then run `go -C tools mod tidy`, regenerate, and review the tool module and
+all generated output in the same change. Run `go mod tidy` separately for
+application dependency changes; CI checks both modules.
 
 ## Code generation rules
 
 - `spec/openapi.yaml` is the **single source of truth**. Never hand-edit
   `*.gen.go` — they are committed only so reviewers and IDEs see what compiles.
-- After editing the spec, run `make gen` and commit the regenerated files in
-  the same PR.
-- If `make gen` produces a diff on a clean tree, generation isn't idempotent —
-  fix the spec or the generator config before opening a PR.
+- Generation modes live in `spec/*.cfg.yaml`; `scripts/gen.sh` owns input and
+  output paths. The models config is shared by server and client generation.
+- After editing the spec, run `npm ci --prefix web` once, then `make gen-all`
+  and commit the regenerated Go files and `web/src/api/schema.gen.ts` together.
+- Regenerating again must leave the outputs unchanged. CI checks both Go and
+  TypeScript outputs against the committed versions.
 
 ## API versioning and deprecation
 
@@ -100,13 +104,13 @@ and must match your git identity.
 ## PR checklist
 
 - [ ] `make lint test audit` passes locally
-- [ ] `make gen` produces no diff (codegen is idempotent)
+- [ ] `make gen-all` produces no diff (Go and TypeScript codegen are in sync)
 - [ ] `make contract-check BASE_SPEC=/path/to/openapi-base.yaml` passes, or
       the PR explains the version/migration strategy for an intentional break
 - [ ] New endpoints have handler implementations, not just generated stubs
 - [ ] No secrets, real DSNs, or customer data in commits
-- [ ] If you changed `spec/openapi.yaml`, the regenerated `*.gen.go` are
-      committed in the same PR
+- [ ] If you changed `spec/openapi.yaml`, the regenerated `*.gen.go` and
+      `web/src/api/schema.gen.ts` are committed in the same PR
 - [ ] Every commit has a `Signed-off-by:` trailer (see [Sign-off (DCO)](#sign-off-dco))
 
 ## Reporting bugs

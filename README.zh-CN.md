@@ -104,8 +104,11 @@ make audit     # govulncheck v1.6.0 + gosec v2.27.1（CI 门禁）
 make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 ```
 
-`oapi-codegen`、`goimports` 和 `govulncheck` 由 `go.mod` 的 `tool` 块固定版本，
-并通过 `go tool` 运行；首次使用时 Go 会自动下载。执行本地 lint 前需要安装
+`oapi-codegen` 在独立的 `tools/go.mod` 模块中固定版本，生成器依赖不参与应用模块的版本选择。
+`spec/*.cfg.yaml` 定义生成模式，`scripts/gen.sh` 集中管理输入输出路径，服务端和客户端模型共用一份配置。
+`goimports` 和 `govulncheck` 仍由根目录的 `go.mod` 固定版本；这些工具均通过 `go tool` 运行，
+首次使用时 Go 会自动下载。CI 校验 `make gen-all` 后 Go 和 TypeScript 产物没有差异，
+并检查两个 Go 模块的依赖是否整理完毕。执行本地 lint 前需要安装
 [golangci-lint v2.12.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
 CI 则使用固定到不可变提交的官方 Action。`make tools` 只安装本地开发辅助工具
 `air` 的固定版本。

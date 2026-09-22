@@ -119,8 +119,13 @@ make audit     # govulncheck v1.6.0 + gosec v2.27.1 (CI gate)
 make docker    # build server image (pass GOPROXY=... if behind GFW)
 ```
 
-`oapi-codegen`, `goimports`, and `govulncheck` are pinned by the `tool` block
-in `go.mod` and run through `go tool`; Go downloads them on first use. Local
+`oapi-codegen` is pinned in the independent `tools/go.mod` module so generator
+dependencies do not affect the application module. `spec/*.cfg.yaml` selects
+the generation modes; `scripts/gen.sh` owns the input and output paths and
+reuses the models config for server and client types. `goimports` and
+`govulncheck` remain pinned in the root `go.mod`. All run through `go tool`;
+Go downloads them on first use. CI checks that `make gen-all` leaves both Go
+and TypeScript outputs unchanged, and that both Go modules are tidy. Local
 linting expects the [official golangci-lint v2.12.2 binary](https://golangci-lint.run/docs/welcome/install/local/),
 while CI uses the official action pinned to an immutable commit. `make tools`
 only installs the pinned `air` binary because it is a local development aid.
