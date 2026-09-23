@@ -26,7 +26,7 @@
 
 ## 技术栈
 
-- Go 1.26+
+- Go 1.27.1
 - gin（HTTP 框架）
 - oapi-codegen v2（代码生成，StrictServerInterface 模式）
 - Gorm（ORM，支持 postgres/mysql/sqlite — 可选启用）
@@ -64,8 +64,8 @@
 6. 按 SKILL.md 第 3 步根据 DATABASE_DRIVER 专用化项目：
    a. 生产代码只保留所选 Gorm dialector 和 golang-migrate adapter；删除另外
       两种数据库的分支、别名和配置校验。
-   b. 把 DB/migration 测试改成所选数据库；PostgreSQL/MySQL 项目不得为了方便
-      而暗中保留 SQLite 测试实现。
+   b. 如果添加 DB/migration 集成测试，应针对所选数据库运行；PostgreSQL/MySQL
+      项目不要使用 SQLite 作为测试捷径。
    c. 执行 go mod tidy，并确认项目源码和 go.mod 直接依赖不含未选择的数据库驱动
       或 migration adapter。第三方 tracing 插件仍可能传递引入数据库包。
 7. 脚本会输出一段 "Manual follow-ups"。逐条处理：
@@ -74,7 +74,7 @@
    b. README.md 的 © 行、chart/Chart.yaml 的 maintainers —— 问我作者署名，
       替换掉 piwriw。
 8. 按顺序验证：
-   - make lint-config               # 应无任何输出
+   - make lint-config               # 应通过
    - make gen                       # 应无 diff
    - make build test lint           # 全部绿
 9. 用一段话汇报：改了什么、还剩哪些事让我自己做（比如"编辑 spec/openapi.yaml
@@ -109,8 +109,9 @@ make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 `spec/*.cfg.yaml` 定义生成模式，`scripts/gen.sh` 集中管理输入输出路径，服务端和客户端模型共用一份配置。
 `goimports` 和 `govulncheck` 仍由根目录的 `go.mod` 固定版本；这些工具均通过 `go tool` 运行，
 首次使用时 Go 会自动下载。CI 校验 `make gen-all` 后 Go 和 TypeScript 产物没有差异，
-并检查两个 Go 模块的依赖是否整理完毕。执行本地 lint 前需要安装
-[golangci-lint v2.12.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
+运行前端 lint、类型检查和生产构建，并检查两个 Go 模块的依赖是否整理完毕。
+执行本地 lint 前需要安装
+[golangci-lint v2.13.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
 CI 则使用固定到不可变提交的官方 Action。`make tools` 只安装本地开发辅助工具
 `air` 的固定版本。
 
@@ -156,7 +157,7 @@ db:
 | `db.conn_max_lifetime` | `30m` | 任意 `time.ParseDuration` 接受的形式 |
 | `db.log_sql` | `false` | `true` 时把每条 SQL 经 gorm 的 Trace 输出 |
 
-每条 SQL 操作都会通过 `gorm.io/plugin/opentelemetry` 成为 OTel span。sqlite 测试用 `file::memory:?cache=shared` 加 `max_open_conns: 1`（见 `internal/db/db_test.go`）——否则连接池里每个连接会拿到独立的内存数据库。
+每条 SQL 操作都会通过 `gorm.io/plugin/opentelemetry` 成为 OTel span。SQLite 集成测试可用 `file::memory:?cache=shared` 并设置 `max_open_conns: 1`，否则连接池里每个连接会拿到独立的内存数据库。
 
 `internal/db.Paginate` 提供从 1 开始、限制单页大小并返回总数元数据的通用分页。
 调用方传入筛选条件和明确、稳定的排序；单页默认 10 条，最多 10000 条：

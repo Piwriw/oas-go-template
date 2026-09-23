@@ -32,7 +32,7 @@ golangci-lint v2 config, and a Next.js + React + TS frontend (deployed separatel
 
 ## Tech Stack
 
-- Go 1.26+
+- Go 1.27.1
 - gin (HTTP framework)
 - oapi-codegen v2 (code generation, StrictServerInterface mode)
 - Gorm (ORM, postgres/mysql/sqlite — opt-in)
@@ -76,8 +76,8 @@ Procedure:
    a. Keep only that Gorm dialector and golang-migrate database adapter in
       production code; remove branches, aliases, and config validation for the
       other two databases.
-   b. Rewrite DB/migration tests for the selected database; do not retain
-      SQLite as an undeclared test shortcut for a PostgreSQL/MySQL project.
+   b. If you add DB/migration integration tests, run them against the selected
+      database; do not use SQLite as a shortcut for PostgreSQL/MySQL.
    c. Run go mod tidy and verify project source plus direct go.mod requirements
       contain no unselected driver or migration adapter. Third-party tracing
       plugins may still pull database packages into the transitive graph.
@@ -87,7 +87,7 @@ Procedure:
    b. README.md © line and chart/Chart.yaml maintainers — ask me for
       author info and update.
 8. Verify the result, in this order:
-   - make lint-config               # must pass with no output
+   - make lint-config               # must pass
    - make gen                       # should produce no diff
    - make build test lint           # all green
 9. Report a one-paragraph summary: what changed, what's left for me to do
@@ -126,7 +126,8 @@ the generation modes; `scripts/gen.sh` owns the input and output paths and
 reuses the models config for server and client types. `goimports` and
 `govulncheck` remain pinned in the root `go.mod`. All run through `go tool`;
 Go downloads them on first use. CI checks that `make gen-all` leaves both Go
-and TypeScript outputs unchanged, and that both Go modules are tidy. Local
+and TypeScript outputs unchanged, runs frontend lint, typecheck, and build,
+and checks that both Go modules are tidy. Local
 linting expects the [official golangci-lint v2.13.2 binary](https://golangci-lint.run/docs/welcome/install/local/),
 while CI uses the official action pinned to an immutable commit. `make tools`
 only installs the pinned `air` binary because it is a local development aid.
@@ -185,9 +186,9 @@ db:
 | `db.log_sql` | `false` | `true` routes every SQL statement through gorm's Trace |
 
 Every SQL operation becomes an OTel span via `gorm.io/plugin/opentelemetry`.
-For sqlite tests use `file::memory:?cache=shared` plus `max_open_conns: 1`
-(see `internal/db/db_test.go`) — without that, each pool connection gets its
-own private memory DB.
+For SQLite integration tests, use `file::memory:?cache=shared` plus
+`max_open_conns: 1` — without that, each pool connection gets its own
+private memory DB.
 
 `internal/db.Paginate` provides one-based, bounded pagination with matching
 count metadata. Pass it a query containing the filters and an explicit stable

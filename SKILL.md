@@ -121,11 +121,9 @@ pool settings, and `schema_migrations`; remove only unselected dialect support.
 4. Update `config.example.yaml`, `README.md`, `README.zh-CN.md`, `AGENTS.md`,
    `CLAUDE.md`, and this skill so the derived project documents only the
    selected database.
-5. Update DB and migration tests. Do not keep SQLite production or test code in
-   a PostgreSQL/MySQL project merely because it is convenient. Run those tests
-   against a disposable instance of the selected database; if the test
-   environment is not available, stop and ask how the customer wants it
-   provisioned instead of deleting coverage.
+5. If the derived project has DB and migration integration tests, run them
+   against a disposable instance of the selected database. Do not use SQLite
+   as a test shortcut for a PostgreSQL/MySQL project.
 6. Run `go mod tidy`. Confirm project-owned Go files do not import unselected
    drivers or migration adapters and `go.mod` does not list them as direct
    requirements. Upstream plugins may import database packages internally, so
@@ -453,7 +451,7 @@ If you reach for `os.Exit(0)` at the end of `main`, gocritic flags `exitAfterDef
 
 ### 10. Generated code must be checked in, not gitignored
 
-`*.gen.go` files are committed to git. Regeneration must leave them unchanged once they match the spec and generator configuration. Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output. CI installs the frontend dependencies and runs `make gen-all`, checking both Go and TypeScript outputs for drift.
+`*.gen.go` files are committed to git. Regeneration must leave them unchanged once they match the spec and generator configuration. Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output. CI runs `make gen-all` to check Go and TypeScript outputs for drift, then runs frontend lint, typecheck, and build.
 
 ### 11. Middleware order: `otelgin` BEFORE `logging`
 
@@ -471,7 +469,7 @@ If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a Dock
 
 ### 13. SQLite `:memory:` is per-connection
 
-Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The `internal/db/db_test.go` test does exactly this.
+Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The template does not include DB unit tests; verify DB behavior in an integration environment.
 
 ### 14. Pass `*gorm.DB` via the service constructor
 

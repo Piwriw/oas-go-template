@@ -103,6 +103,12 @@ jobs:
             exit 1
           fi
 
+      - name: Frontend lint, typecheck, and build
+        run: |
+          npm run lint --prefix web
+          npm run typecheck --prefix web
+          npm run build --prefix web
+
       - name: OpenAPI breaking-change check
         if: github.event_name == 'pull_request'
         run: |
