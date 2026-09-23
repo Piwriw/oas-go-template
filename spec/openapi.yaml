@@ -97,6 +97,37 @@ paths:
           $ref: '#/components/responses/ContentTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/greetings:
+    post:
+      operationId: generateGreeting
+      summary: Generate a greeting for a name.
+      tags:
+        - example
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GreetingRequest'
+      responses:
+        '200':
+          description: generated greeting
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greeting'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '413':
+          $ref: '#/components/responses/ContentTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   responses:
     BadRequest:
@@ -136,6 +167,22 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    GreetingRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+    Greeting:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
     Health:
       type: object
       required:

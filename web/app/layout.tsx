@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'oas-go-template web',
-  description: 'A React frontend for the oas-go-template service.',
+  title: 'API Workbench | oas-go-template',
+  description: 'Service status and typed API example for oas-go-template.',
   icons: {
     icon: '/favicon.svg',
   },

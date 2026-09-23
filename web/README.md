@@ -5,10 +5,16 @@ deployed as a static export served by CDN or Nginx.
 
 ## Dev
 
+Start the Go backend from the repo root with `make run`, then start the frontend:
+
 ```bash
-npm install
+npm ci
 npm run dev
 ```
+
+The workbench shows `/healthz`, `/readyz`, and `/version`, and submits
+`POST /v1/greetings` through the typed API client. If the backend is down, it
+shows an offline state and lets you retry.
 
 ## Build
 
@@ -41,6 +47,12 @@ instance typed against those paths. It defaults to `http://localhost:8000`;
 set `NEXT_PUBLIC_API_BASE_URL` at build time to point elsewhere. Next inlines
 `NEXT_PUBLIC_*` into the bundle, so this is fixed at build time and cannot be
 changed by restarting the container.
+
+For a Docker image targeting another backend, run from the repo root:
+
+```bash
+make web-docker NEXT_PUBLIC_API_BASE_URL=https://api.example.com
+```
 
 ```ts
 import { client } from './api/client'

@@ -285,6 +285,11 @@ If a handler method is missing, the compile-time assertion
 `internal/handler/handler_test.go` fails the build with a clear error listing
 every missing method.
 
+`POST /v1/greetings` is a replaceable end-to-end example. Send
+`{"name":"Ada"}` to receive `{"message":"Hello, Ada!"}`; blank names return
+the common `Error` response. The frontend workbench displays the operational
+probes and calls this endpoint through the generated TypeScript types.
+
 ## API Contract
 
 The API uses URL-prefix versioning. The operational probes `/healthz`,

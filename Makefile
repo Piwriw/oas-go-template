@@ -91,7 +91,7 @@ docker:  ## Build server docker image (override GOPROXY via env if behind restri
 	  -t oas-go-template:latest .
 
 web-docker:  ## Build frontend docker image (multi-stage: node build → nginx serve)
-	docker build -f web/Dockerfile -t oas-go-template-web:latest web/
+	docker build $(if $(NEXT_PUBLIC_API_BASE_URL),--build-arg NEXT_PUBLIC_API_BASE_URL=$(NEXT_PUBLIC_API_BASE_URL)) -f web/Dockerfile -t oas-go-template-web:latest web/
 
 helm-lint:  ## Lint the Helm chart (requires helm 3)
 	helm lint chart/

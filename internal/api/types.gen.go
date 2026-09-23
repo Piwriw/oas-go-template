@@ -25,6 +25,16 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Greeting defines model for Greeting.
+type Greeting struct {
+	Message string `json:"message"`
+}
+
+// GreetingRequest defines model for GreetingRequest.
+type GreetingRequest struct {
+	Name string `json:"name"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Status  HealthStatus `json:"status"`
@@ -63,3 +73,6 @@ type MethodNotAllowed = Error
 
 // NotFound defines model for NotFound.
 type NotFound = Error
+
+// GenerateGreetingJSONRequestBody defines body for GenerateGreeting for application/json ContentType.
+type GenerateGreetingJSONRequestBody = GreetingRequest

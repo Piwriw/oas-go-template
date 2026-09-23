@@ -12,6 +12,7 @@ RUN npm ci --no-audit --no-fund
 
 # Copy the rest of the source and build the production bundle.
 COPY . .
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 RUN npm run build
 
 # Runtime: nginx-unprivileged binds 8080 as non-root, matching the

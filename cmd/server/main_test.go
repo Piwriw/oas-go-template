@@ -83,6 +83,43 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 	}
 }
 
+// TestGreetingEndpoint verifies generated binding, contract validation, and service error mapping over HTTP.
+func TestGreetingEndpoint(t *testing.T) {
+	srv := newHTTPServer(testConfig(), nil)
+	cases := []struct {
+		name        string
+		body        string
+		wantStatus  int
+		wantMessage string
+		wantCode    int32
+	}{
+		{"valid name", `{"name":" Ada "}`, http.StatusOK, "Hello, Ada!", 0},
+		{"blank name", `{"name":"   "}`, http.StatusBadRequest, "name must not be blank", int32(errcode.InvalidRequest)},
+		{"empty name", `{"name":""}`, http.StatusBadRequest, "invalid request", int32(errcode.InvalidRequest)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/v1/greetings", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			srv.Handler.ServeHTTP(rec, req)
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d; body = %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+			var body struct {
+				Code    int32  `json:"code"`
+				Message string `json:"message"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Message != tc.wantMessage || body.Code != tc.wantCode {
+				t.Errorf("response = %+v, want message %q and code %d", body, tc.wantMessage, tc.wantCode)
+			}
+		})
+	}
+}
+
 // TestCORSAllowsAllOriginsAndPreflight verifies the built-in browser policy accepts every origin.
 func TestCORSAllowsAllOriginsAndPreflight(t *testing.T) {
 	srv := newHTTPServer(testConfig(), nil)

@@ -235,6 +235,8 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 
 如果漏写了某个 handler 方法，`internal/handler/handler_test.go` 里的编译期断言 `var _ api.StrictServerInterface = (*Handler)(nil)` 会让构建失败，并列出所有缺失的方法。
 
+`POST /v1/greetings` 是可替换的端到端示例：发送 `{"name":"Ada"}` 会得到 `{"message":"Hello, Ada!"}`；空白名字返回统一的 `Error` 响应。前端工作台通过生成的 TypeScript 类型展示运维探针并调用该接口。
+
 ## API 契约
 
 API 使用 URL 前缀版本化。由于 Kubernetes 和负载均衡器依赖稳定地址，运维探针 `/healthz`、`/readyz` 和 `/version` 保持不带版本；后续业务接口必须放在 `/vN/` 下（例如 `/v1/orders`）。这项规则由 `spec/openapi.yaml` 中的 `x-api-version` 和 `x-versioning` 声明，并在服务启动时校验。

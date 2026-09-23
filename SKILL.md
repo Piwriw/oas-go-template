@@ -102,7 +102,7 @@ At the end you'll see a "Manual follow-ups" block. **Read it.** It tells you to 
 
 - `chart/values.yaml`: defaults are already `<new-name>` / `<new-name>-web` (rewritten by the short-name pass — matches the Docker tags produced by `make docker` / `make web-docker`, so local clusters like kind/k3s/minikube work with no edits). Only add a registry prefix by hand if you push to a remote, e.g. `ghcr.io/yourorg/<new-name>`.
 - `README.md` © line and `chart/Chart.yaml` maintainers — author/copyright info, edit by hand.
-- `spec/openapi.yaml` — replace the example `/healthz` `/readyz` `/version` paths with your real API.
+- `spec/openapi.yaml` — keep `/healthz`, `/readyz`, and `/version`; replace `/v1/greetings` with your real business API.
 
 ### Step 3 — Keep one database driver
 
@@ -157,7 +157,7 @@ imports PostgreSQL and ClickHouse drivers internally even in a MySQL project.
 
 ### Step 4 — Replace the spec with your real API
 
-Edit `spec/openapi.yaml`. Throw away the `Health` / `VersionInfo` / `Error` examples if you don't need them, but **keep at least one path and one schema** so the generator has something to render. Empty specs produce empty `*.gen.go` files, which then break compilation when `cmd/server/main.go` references symbols that no longer exist.
+Edit `spec/openapi.yaml`. Keep the operational paths and their schemas; the server depends on them. Replace the `/v1/greetings` example and its schemas with your real business API. **Keep at least one path and one schema** so the generator has something to render. Empty specs produce empty `*.gen.go` files, which then break compilation when `cmd/server/main.go` references symbols that no longer exist.
 
 Then regenerate:
 
