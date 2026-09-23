@@ -15,6 +15,17 @@ type echoResp struct {
 	Echoed string `json:"echoed"`
 }
 
+type closeTrackingBody struct {
+	io.ReadCloser
+	closed bool
+}
+
+// Close records whether the original transport response body was released.
+func (b *closeTrackingBody) Close() error {
+	b.closed = true
+	return b.ReadCloser.Close()
+}
+
 // TestHttpError_Error_Format verifies upstream failure messages retain request and response context.
 func TestHttpError_Error_Format(t *testing.T) {
 	e := &httpError{
@@ -233,6 +244,23 @@ func TestDoVoid_Success_ReturnsResponseWithClosedBody(t *testing.T) {
 	n, _ := io.ReadAll(resp.Body)
 	if len(n) != 0 {
 		t.Errorf("body not drained: %d bytes left", len(n))
+	}
+}
+
+// TestDoVoid_ClosesOriginalBody verifies replacing the returned body does not leak the transport body.
+func TestDoVoid_ClosesOriginalBody(t *testing.T) {
+	body := &closeTrackingBody{ReadCloser: io.NopCloser(strings.NewReader("ignored"))}
+	c := New(WithTransport(roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+	})))
+
+	resp, err := c.DoVoid(context.Background(), http.MethodGet, "https://example.com", nil)
+	if err != nil {
+		t.Fatalf("DoVoid err: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if !body.closed {
+		t.Error("original response body was not closed")
 	}
 }
 

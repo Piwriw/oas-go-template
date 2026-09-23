@@ -87,7 +87,8 @@ func (c *Client) do(ctx context.Context, method, url string, body any, handle fu
 	if err != nil {
 		return nil, fmt.Errorf("httpx: send request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	// DoVoid replaces resp.Body after draining it; close the original body.
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit))
@@ -108,6 +109,7 @@ func (c *Client) do(ctx context.Context, method, url string, body any, handle fu
 // Do sends a policy-aware HTTP request and decodes a successful JSON response into *T.
 func (c *Client) Do[T any](ctx context.Context, method, url string, body any) (*T, error) {
 	var out T
+	//nolint:bodyclose // c.do closes the original response body before returning.
 	_, err := c.do(ctx, method, url, body, func(resp *http.Response) error {
 		if resp.StatusCode == http.StatusNoContent || resp.ContentLength == 0 {
 			return nil

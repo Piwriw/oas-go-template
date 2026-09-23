@@ -13,7 +13,7 @@ LDFLAGS     := -X $(VERSION_PKG).Version=$(VERSION) \
 
 # The generator is pinned in tools/go.mod; goimports and govulncheck in go.mod.
 # Other tools run outside the application module graph at the versions below.
-GOLANGCI_LINT_VERSION ?= 2.12.2
+GOLANGCI_LINT_VERSION ?= 2.13.2
 GOSEC_VERSION ?= v2.27.1
 AIR_VERSION ?= v1.66.0
 OASDIFF_VERSION ?= v1.10.28

@@ -127,7 +127,7 @@ reuses the models config for server and client types. `goimports` and
 `govulncheck` remain pinned in the root `go.mod`. All run through `go tool`;
 Go downloads them on first use. CI checks that `make gen-all` leaves both Go
 and TypeScript outputs unchanged, and that both Go modules are tidy. Local
-linting expects the [official golangci-lint v2.12.2 binary](https://golangci-lint.run/docs/welcome/install/local/),
+linting expects the [official golangci-lint v2.13.2 binary](https://golangci-lint.run/docs/welcome/install/local/),
 while CI uses the official action pinned to an immutable commit. `make tools`
 only installs the pinned `air` binary because it is a local development aid.
 
