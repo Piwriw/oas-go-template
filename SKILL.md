@@ -164,6 +164,7 @@ Edit `spec/openapi.yaml`. Throw away the `Health` / `VersionInfo` / `Error` exam
 Then regenerate:
 
 ```bash
+make lint-oas
 make gen
 ```
 
@@ -220,6 +221,7 @@ If you forget a method, this line fails the build with a clear error listing eve
 make build       # binaries land in bin/
 make test        # go test -race -cover ./...
 make lint        # official golangci-lint v2 binary, excludes *.gen.go
+make lint-oas    # validate spec/openapi.yaml with pinned Redocly CLI
 make audit       # go tool govulncheck + isolated gosec (CI gate)
 make docker GOPROXY=https://goproxy.cn,direct   # remove GOPROXY if not behind GFW
 docker run --rm -d -p 18000:8000 --name smoke my-new-project:latest
@@ -259,6 +261,7 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 | `make gen` | Regenerate backend `*.gen.go` from `spec/openapi.yaml` |
 | `make gen-web` | Regenerate the TypeScript API client in `web/src/api/` |
 | `make gen-all` | Regenerate backend and frontend together |
+| `make lint-oas` | Validate `spec/openapi.yaml` with Redocly |
 | `make build` | Build `bin/server` (with version ldflags) |
 | `make run` | `go run` server (with ldflags) |
 | `make migrate-up` | Apply all pending DB migrations from `CONFIG` (default `config.yaml`) |
@@ -397,7 +400,7 @@ Generates `Version *string`, not `Version string`. Either add it to `required` o
 
 ### 4. `go mod tidy` raises the Go directive
 
-The repository pins Go `1.26.5` in `go.mod`, and `build/Dockerfile` uses the same exact toolchain version. Keep them aligned; `make supply-chain-check` rejects a drift and also verifies explicit Docker tags and GitHub Action SHAs.
+The repository pins Go `1.27.1` in `go.mod`, and `build/Dockerfile` uses the same exact toolchain version. Keep them aligned; `make supply-chain-check` rejects a drift and also verifies explicit Docker tags and GitHub Action SHAs.
 
 ### 5. semconv version must match the OTel SDK detectors
 

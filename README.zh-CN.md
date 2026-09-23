@@ -94,6 +94,7 @@ author 的值再继续。
 ```bash
 make gen       # 从 spec/openapi.yaml 重新生成 Go 侧 *.gen.go（固定 oapi-codegen v2.7.1）
 make gen-web   # 重新生成 web/src/api 下的 TypeScript client（需先在 web/ 执行 npm ci）
+make lint-oas  # 校验 spec/openapi.yaml（需先在 web/ 执行 npm ci）
 make tools     # 安装可选的本地热重载工具 air
 make build     # 编译 cmd/server 到 bin/
 make run       # 带版本 ldflags 的 go run cmd/server

@@ -33,6 +33,9 @@ The Docker image uses the static `out/` export and serves it on port `8080`.
 `openapi-typescript` — run `make gen-web` from the repo root. It holds **types
 only**; never hand-edit it.
 
+Run `make lint-oas` from the repo root to validate the same contract with the
+Redocly CLI pinned in this package's lockfile.
+
 The runtime client is `src/api/client.ts`, a hand-written `openapi-fetch`
 instance typed against those paths. It defaults to `http://localhost:8000`;
 set `NEXT_PUBLIC_API_BASE_URL` at build time to point elsewhere. Next inlines

@@ -109,6 +109,7 @@ For a project you've already initialized (or to explore the template itself):
 ```bash
 make gen       # regenerate Go *.gen.go (pinned oapi-codegen v2.7.1)
 make gen-web   # regenerate the TypeScript client in web/src/api (run npm ci in web/ first)
+make lint-oas  # validate spec/openapi.yaml (run npm ci in web/ first)
 make tools     # install air for optional local live reload
 make build     # build cmd/server into bin/
 make run       # go run cmd/server with version ldflags

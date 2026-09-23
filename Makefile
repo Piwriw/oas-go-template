@@ -1,5 +1,5 @@
 # oas-go-template Makefile
-.PHONY: help gen gen-web gen-all tools contract-check supply-chain-check build run migrate-up migrate-down test lint lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
+.PHONY: help gen gen-web gen-all tools contract-check supply-chain-check build run migrate-up migrate-down test lint lint-oas lint-config lint-version-check fmt audit docker web-docker helm-lint helm-template dev clean web-dev web-build dev-stack dev-stack-down
 
 # Build metadata injected via ldflags. Override like: make build VERSION=v1.0.0
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -35,6 +35,9 @@ gen-web:  ## Generate frontend: TypeScript API client into web/src/api (needs we
 	cd web && npm run gen:api
 
 gen-all: gen gen-web  ## Generate both backend and frontend from spec/openapi.yaml
+
+lint-oas:  ## Validate the OpenAPI contract with pinned Redocly CLI
+	cd web && npm run lint:oas
 
 contract-check:  ## Reject breaking OpenAPI changes against BASE_SPEC
 	go run github.com/tufin/oasdiff@$(OASDIFF_VERSION) breaking "$(BASE_SPEC)" spec/openapi.yaml --fail-on ERR

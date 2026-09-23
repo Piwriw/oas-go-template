@@ -83,6 +83,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefix web --no-audit --no-fund
 
+      - name: Validate OpenAPI contract
+        run: make lint-oas
+
       - name: Verify immutable supply-chain pins
         run: make supply-chain-check
 

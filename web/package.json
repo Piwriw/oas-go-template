@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "gen:api": "openapi-typescript ../spec/openapi.yaml -o src/api/schema.gen.ts",
+    "lint:oas": "redocly lint ../spec/openapi.yaml --config ../redocly.yaml",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit"
   },
@@ -19,6 +20,7 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@redocly/cli": "2.54.2",
     "openapi-typescript": "7.13.0",
     "oxlint": "^1.71.0",
     "typescript": "^5.9.0"

@@ -27,6 +27,7 @@ make gen build test
 
 ```bash
 make gen        # regenerate *.gen.go after editing spec/openapi.yaml
+make lint-oas   # validate the OpenAPI document and operation metadata
 make tools      # optionally install pinned air for live reload
 make lint-config lint test  # always green before pushing
 make audit      # govulncheck v1.6.0 + gosec v2.27.1
@@ -103,7 +104,7 @@ and must match your git identity.
 
 ## PR checklist
 
-- [ ] `make lint test audit` passes locally
+- [ ] `make lint-oas lint test audit` passes locally
 - [ ] `make gen-all` produces no diff (Go and TypeScript codegen are in sync)
 - [ ] `make contract-check BASE_SPEC=/path/to/openapi-base.yaml` passes, or
       the PR explains the version/migration strategy for an intentional break

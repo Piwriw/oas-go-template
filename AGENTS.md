@@ -15,6 +15,7 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Regenerate backend code from `spec/openapi.yaml` | `make gen` |
 | Regenerate frontend API client | `make gen-web` |
 | Regenerate both | `make gen-all` |
+| Validate OpenAPI spec | `make lint-oas` |
 | Build server | `make build` |
 | Run server (with ldflags) | `make run` |
 | Run all tests | `make test` |
@@ -28,7 +29,7 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Build frontend Docker image | `make web-docker` |
 | Local Jaeger + OTel collector | `make dev-stack` / `make dev-stack-down` |
 
-`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`. The repository toolchain is Go `1.26.5`; `make supply-chain-check` verifies that version, explicit Docker tags, and GitHub Action SHAs remain aligned.
+`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`. The repository toolchain is Go `1.27.1`; `make supply-chain-check` verifies that version, explicit Docker tags, and GitHub Action SHAs remain aligned.
 
 ## Architecture
 
@@ -67,6 +68,11 @@ it earlier is a breaking contract change.
 `oasdiff` v1.10.28. Pull request CI supplies the target branch's spec as the
 baseline and fails on ERR-level breaking changes. Intentional breaking changes
 require a new `/vN` API version and a migration plan.
+
+`make lint-oas` runs the Redocly CLI pinned in `web/package.json` against the
+same spec. `redocly.yaml` enables structural validation and requires operation
+summaries and IDs. CI runs this before checking generated files; it does not
+replace the breaking-change check or `internal/oas` policy validation.
 
 ### StrictServerInterface pattern
 
