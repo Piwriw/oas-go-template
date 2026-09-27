@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Builder: install deps (cached layer) and run the Next static export → ./out
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /src
 
