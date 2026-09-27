@@ -70,6 +70,21 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix web --no-audit --no-fund
+
+      - name: Validate OpenAPI contract
+        run: make lint-oas
 
       - name: Verify immutable supply-chain pins
         run: make supply-chain-check
@@ -79,14 +94,20 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - name: Codegen sync (make gen produces no diff)
+      - name: Codegen sync (make gen-all produces no diff)
         run: |
-          make gen
-          if ! git diff --exit-code -- internal/api/ pkg/api/; then
-            echo "::error::spec/openapi.yaml and *.gen.go are out of sync. Run 'make gen' and commit the result."
+          make gen-all
+          if ! git diff --exit-code -- internal/api/ pkg/api/ web/src/api/schema.gen.ts; then
+            echo "::error::spec/openapi.yaml and generated Go/TypeScript files are out of sync. Run 'make gen-all' and commit the result."
             git diff --stat
             exit 1
           fi
+
+      - name: Frontend lint, typecheck, and build
+        run: |
+          npm run lint --prefix web
+          npm run typecheck --prefix web
+          npm run build --prefix web
 
       - name: OpenAPI breaking-change check
         if: github.event_name == 'pull_request'
@@ -94,18 +115,19 @@ jobs:
           git show "origin/${{ github.event.pull_request.base.ref }}:spec/openapi.yaml" > /tmp/openapi-base.yaml
           make contract-check BASE_SPEC=/tmp/openapi-base.yaml
 
-      - name: go.mod / go.sum sync
+      - name: Application and generator module sync
         run: |
           go mod tidy
-          if ! git diff --exit-code -- go.mod go.sum; then
-            echo "::error::go.mod or go.sum out of sync. Run 'go mod tidy' and commit."
+          go -C tools mod tidy
+          if ! git diff --exit-code -- go.mod go.sum tools/go.mod tools/go.sum; then
+            echo "::error::Module files out of sync. Run 'go mod tidy' and 'go -C tools mod tidy', then commit."
             exit 1
           fi
 
       - name: Lint (golangci-lint v2)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.12.2
+          version: v2.13.2
 
       - name: Test (race + cover)
         run: make test

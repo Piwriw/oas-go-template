@@ -69,10 +69,12 @@ echo
 
 # ─── File globs ──────────────────────────────────────────────────────────────
 
-# Files that should be rewritten. Excludes *.gen.go (regenerated below),
-# .git/, node_modules/, and binary artifacts.
+# Files that should be rewritten. Generated Go/TS files are regenerated or
+# checked separately; caches and binary artifacts are excluded.
 INCLUDES=(
     --include='*.go'
+    --include='*.ts'
+    --include='*.tsx'
     --include='*.yaml'
     --include='*.yml'
     --include='Makefile'
@@ -87,6 +89,8 @@ INCLUDES=(
 EXCLUDES=(
     --exclude-dir=.git
     --exclude-dir=node_modules
+    --exclude-dir=.next
+    --exclude-dir=out
     --exclude-dir=dist
     --exclude-dir=bin
 )
@@ -96,7 +100,7 @@ rewrite() {
     local old=$1 new=$2
     # shellcheck disable=SC2086
     grep -rl "$old" "${INCLUDES[@]}" "${EXCLUDES[@]}" . \
-        | grep -v '\.gen\.go$' \
+        | grep -Ev '\.gen\.(go|ts)$' \
         | xargs -r sed -i.bak "s|${old}|${new}|g" || true
 }
 
@@ -128,7 +132,7 @@ echo
 echo "Checking for leftovers..."
 leftovers=$(grep -rn "$OLD_MOD\|$OLD_NAME" \
     "${INCLUDES[@]}" "${EXCLUDES[@]}" . \
-    | grep -v '\.gen\.go$' \
+    | grep -Ev '\.gen\.(go|ts)$' \
     | grep -v 'init-project.sh' \
     || true)
 
@@ -152,8 +156,8 @@ Manual follow-ups (the script can't infer these):
      (script rewrote them — matches the Docker tags from 'make docker' /
      'make web-docker'). Prepend your registry prefix only if you push to a
      remote, e.g.  ghcr.io/yourorg/$NEW_NAME
-  2. spec/openapi.yaml: replace the example paths (/healthz, /readyz, /version)
-     with your real API, then run 'make gen' again.
+  2. spec/openapi.yaml: replace the /v1/greetings example with your real API;
+     keep the operational probes, then run 'make gen-all' again.
   3. Author / copyright: README.md (© line) and chart/Chart.yaml (maintainers)
      still name the original author — edit by hand.
   4. Git: if you haven't already,

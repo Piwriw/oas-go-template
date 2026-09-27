@@ -111,7 +111,7 @@ func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var lastErr error
 
 	for attempt := 0; attempt < t.policy.MaxAttempts; attempt++ {
-		// For retries we must send a fresh body. GetBody is set by Do[T]/DoVoid.
+		// For retries we must send a fresh body. GetBody is set by Client.do.
 		if attempt > 0 {
 			if req.GetBody != nil {
 				newReq, err := req.GetBody()

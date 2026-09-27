@@ -15,6 +15,7 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Regenerate backend code from `spec/openapi.yaml` | `make gen` |
 | Regenerate frontend API client | `make gen-web` |
 | Regenerate both | `make gen-all` |
+| Validate OpenAPI spec | `make lint-oas` |
 | Build server | `make build` |
 | Run server (with ldflags) | `make run` |
 | Run all tests | `make test` |
@@ -28,13 +29,16 @@ For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md i
 | Build frontend Docker image | `make web-docker` |
 | Local Jaeger + OTel collector | `make dev-stack` / `make dev-stack-down` |
 
-`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`. The repository toolchain is Go `1.26.5`; `make supply-chain-check` verifies that version, explicit Docker tags, and GitHub Action SHAs remain aligned.
+`audit` exits non-zero on any reachable vuln or finding; that's intentional for CI. `fmt` enforces std / third-party / `github.com/piwriw/oas-go-template` ordering via `-local`. The repository toolchain is Go `1.27.1`; `make supply-chain-check` verifies that version, explicit Docker tags, and GitHub Action SHAs remain aligned.
 
 ## Architecture
 
 ### OAS-driven codegen (5 outputs, one spec)
 
-`scripts/gen.sh` invokes `oapi-codegen` five times against `spec/openapi.yaml`:
+`scripts/gen.sh` invokes the generator pinned in `tools/go.mod` five times
+against `spec/openapi.yaml`. The `spec/*.cfg.yaml` files select models, server,
+client, or embedded-spec generation; the script owns input and output paths.
+`models.cfg.yaml` is shared by the two model outputs:
 
 | Output | Package | Role |
 |--------|---------|------|
@@ -64,6 +68,11 @@ it earlier is a breaking contract change.
 `oasdiff` v1.10.28. Pull request CI supplies the target branch's spec as the
 baseline and fails on ERR-level breaking changes. Intentional breaking changes
 require a new `/vN` API version and a migration plan.
+
+`make lint-oas` runs the Redocly CLI pinned in `web/package.json` against the
+same spec. `redocly.yaml` enables structural validation and requires operation
+summaries and IDs. CI runs this before checking generated files; it does not
+replace the breaking-change check or `internal/oas` policy validation.
 
 ### StrictServerInterface pattern
 
@@ -160,8 +169,13 @@ separate shutdown state or drain delay. Keep the Helm
 
 ### Developer tool management
 
-The `tool` block in `go.mod` pins `oapi-codegen`, `goimports`, and
-`govulncheck`; invoke them through `go tool`, not globally installed binaries.
+The `tool` directive in `tools/go.mod` pins `oapi-codegen`, isolating generator
+dependencies from the application. `make gen` runs it from that module with
+absolute input and output paths. The root `go.mod` still pins `goimports` and
+`govulncheck`; invoke these tools through `go tool`, not globally installed binaries.
+After dependency changes, tidy both modules with `go mod tidy` and
+`go -C tools mod tidy`. CI checks both modules and regenerates Go and TypeScript
+outputs with `make gen-all` to detect drift from the spec or generator configs.
 `golangci-lint` intentionally stays outside the application module graph:
 local development uses its official release binary and CI uses the official
 Action pinned to a commit SHA. `oasdiff` and `gosec` remain isolated behind

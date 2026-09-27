@@ -1,7 +1,0 @@
-# oapi-codegen base configuration.
-# scripts/gen.sh invokes oapi-codegen multiple times, supplying -generate and -o
-# flags per output. We keep this file for shared options only (package, output-options).
-package: api
-
-output-options:
-  skip-prune: false

@@ -30,7 +30,8 @@ Don't use this skill for:
 |------|--------------|-----------------|
 | `spec/openapi.yaml` | The contract. Server stubs and client SDK are generated from this. | **Yes — your real API goes here** |
 | `scripts/init-project.sh` | One-shot renamer for module path + project name. | Run it once; don't edit |
-| `oapi-codegen.yaml` | Generator base config (package name only). | Only if changing package layout |
+| `spec/*.cfg.yaml` | Generation modes and options; models config shared by server and client. | Only if changing generation behavior |
+| `tools/go.mod`, `tools/go.sum` | Independent module pinning the OpenAPI generator and its dependencies. | When upgrading the generator |
 | `scripts/gen.sh` | Calls oapi-codegen 5 times to produce types + server + client + embedded spec. | No |
 | `config.example.yaml` | Sample config; copy to `config.yaml` (gitignored) and edit. | Yes — your real defaults go here |
 | `cmd/server/main.go` | Server entrypoint. Wires config → otel → gin → service → handler. | Rename `serviceName` (auto by init script); otherwise rarely |
@@ -101,7 +102,7 @@ At the end you'll see a "Manual follow-ups" block. **Read it.** It tells you to 
 
 - `chart/values.yaml`: defaults are already `<new-name>` / `<new-name>-web` (rewritten by the short-name pass — matches the Docker tags produced by `make docker` / `make web-docker`, so local clusters like kind/k3s/minikube work with no edits). Only add a registry prefix by hand if you push to a remote, e.g. `ghcr.io/yourorg/<new-name>`.
 - `README.md` © line and `chart/Chart.yaml` maintainers — author/copyright info, edit by hand.
-- `spec/openapi.yaml` — replace the example `/healthz` `/readyz` `/version` paths with your real API.
+- `spec/openapi.yaml` — keep `/healthz`, `/readyz`, and `/version`; replace `/v1/greetings` with your real business API.
 
 ### Step 3 — Keep one database driver
 
@@ -120,11 +121,9 @@ pool settings, and `schema_migrations`; remove only unselected dialect support.
 4. Update `config.example.yaml`, `README.md`, `README.zh-CN.md`, `AGENTS.md`,
    `CLAUDE.md`, and this skill so the derived project documents only the
    selected database.
-5. Update DB and migration tests. Do not keep SQLite production or test code in
-   a PostgreSQL/MySQL project merely because it is convenient. Run those tests
-   against a disposable instance of the selected database; if the test
-   environment is not available, stop and ask how the customer wants it
-   provisioned instead of deleting coverage.
+5. If the derived project has DB and migration integration tests, run them
+   against a disposable instance of the selected database. Do not use SQLite
+   as a test shortcut for a PostgreSQL/MySQL project.
 6. Run `go mod tidy`. Confirm project-owned Go files do not import unselected
    drivers or migration adapters and `go.mod` does not list them as direct
    requirements. Upstream plugins may import database packages internally, so
@@ -158,19 +157,21 @@ imports PostgreSQL and ClickHouse drivers internally even in a MySQL project.
 
 ### Step 4 — Replace the spec with your real API
 
-Edit `spec/openapi.yaml`. Throw away the `Health` / `VersionInfo` / `Error` examples if you don't need them, but **keep at least one path and one schema** so the generator has something to render. Empty specs produce empty `*.gen.go` files, which then break compilation when `cmd/server/main.go` references symbols that no longer exist.
+Edit `spec/openapi.yaml`. Keep the operational paths and their schemas; the server depends on them. Replace the `/v1/greetings` example and its schemas with your real business API. **Keep at least one path and one schema** so the generator has something to render. Empty specs produce empty `*.gen.go` files, which then break compilation when `cmd/server/main.go` references symbols that no longer exist.
 
 Then regenerate:
 
 ```bash
+make lint-oas
 make gen
 ```
 
-The `tool` block in `go.mod` pins `oapi-codegen` to v2.7.1 so committed
+The `tool` directive in `tools/go.mod` pins `oapi-codegen` to v2.7.1 so committed
 generated files remain deterministic in CI. Upgrade deliberately with
-`go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@vX.Y.Z`,
-run `make gen`, review the full generated diff, and commit the module and
-generated changes together.
+`go -C tools get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@vX.Y.Z`,
+run `go -C tools mod tidy` and `make gen`, review the full generated diff, and
+commit the tool module and generated changes together. The application and
+generator modules are tidied independently; CI checks both.
 
 `scripts/gen.sh` calls `oapi-codegen` **five** times:
 
@@ -218,6 +219,7 @@ If you forget a method, this line fails the build with a clear error listing eve
 make build       # binaries land in bin/
 make test        # go test -race -cover ./...
 make lint        # official golangci-lint v2 binary, excludes *.gen.go
+make lint-oas    # validate spec/openapi.yaml with pinned Redocly CLI
 make audit       # go tool govulncheck + isolated gosec (CI gate)
 make docker GOPROXY=https://goproxy.cn,direct   # remove GOPROXY if not behind GFW
 docker run --rm -d -p 18000:8000 --name smoke my-new-project:latest
@@ -257,6 +259,7 @@ The script's `grep` pass uses these include globs: `*.go *.yaml *.yml Makefile D
 | `make gen` | Regenerate backend `*.gen.go` from `spec/openapi.yaml` |
 | `make gen-web` | Regenerate the TypeScript API client in `web/src/api/` |
 | `make gen-all` | Regenerate backend and frontend together |
+| `make lint-oas` | Validate `spec/openapi.yaml` with Redocly |
 | `make build` | Build `bin/server` (with version ldflags) |
 | `make run` | `go run` server (with ldflags) |
 | `make migrate-up` | Apply all pending DB migrations from `CONFIG` (default `config.yaml`) |
@@ -341,7 +344,7 @@ When you add domain errors, allocate a range here and define typed constants. Co
 
 These all bit the original build. Read before debugging.
 
-### 1. `oapi-codegen.yaml` v2 syntax
+### 1. Generator config v2 syntax and output paths
 
 **Wrong** (v1-style, fails to parse):
 
@@ -357,11 +360,18 @@ output:
 
 ```yaml
 package: api
+generate:
+  models: true
 output-options:
   skip-prune: false
 ```
 
-Leave `generate` and `output` to command-line flags in `scripts/gen.sh`. **If you put `output:` in the config file, it overrides `-o` and all five generations land in the same file.**
+Keep generation modes in `spec/models.cfg.yaml`, `server.cfg.yaml`,
+`client.cfg.yaml`, and `embedded.cfg.yaml`. Leave `output` to `-o` in
+`scripts/gen.sh`: the models config is reused for two destinations, so an
+`output:` entry would override the command-line destination. The script runs
+inside `tools/` and uses absolute paths so they do not depend on the caller's
+working directory. Keep `skip-prune: false` unless unused schemas must be exported.
 
 ### 2. Generated method names don't match tutorials
 
@@ -388,7 +398,7 @@ Generates `Version *string`, not `Version string`. Either add it to `required` o
 
 ### 4. `go mod tidy` raises the Go directive
 
-The repository pins Go `1.26.5` in `go.mod`, and `build/Dockerfile` uses the same exact toolchain version. Keep them aligned; `make supply-chain-check` rejects a drift and also verifies explicit Docker tags and GitHub Action SHAs.
+The repository pins Go `1.27.1` in `go.mod`, and `build/Dockerfile` uses the same exact toolchain version. Keep them aligned; `make supply-chain-check` rejects a drift and also verifies explicit Docker tags and GitHub Action SHAs.
 
 ### 5. semconv version must match the OTel SDK detectors
 
@@ -441,7 +451,7 @@ If you reach for `os.Exit(0)` at the end of `main`, gocritic flags `exitAfterDef
 
 ### 10. Generated code must be checked in, not gitignored
 
-`*.gen.go` files are committed to git. They are stable across runs (`make gen` is idempotent — verified by `git status` being clean afterwards). Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output.
+`*.gen.go` files are committed to git. Regeneration must leave them unchanged once they match the spec and generator configuration. Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output. CI runs `make gen-all` to check Go and TypeScript outputs for drift, then runs frontend lint, typecheck, and build.
 
 ### 11. Middleware order: `otelgin` BEFORE `logging`
 
@@ -459,7 +469,7 @@ If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a Dock
 
 ### 13. SQLite `:memory:` is per-connection
 
-Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The `internal/db/db_test.go` test does exactly this.
+Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The template does not include DB unit tests; verify DB behavior in an integration environment.
 
 ### 14. Pass `*gorm.DB` via the service constructor
 

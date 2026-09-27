@@ -1,0 +1,6 @@
+# Shared by the server and client model outputs; gen.sh owns their paths.
+package: api
+generate:
+  models: true
+output-options:
+  skip-prune: false

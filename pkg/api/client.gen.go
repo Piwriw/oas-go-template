@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -92,6 +93,11 @@ type ClientInterface interface {
 	// GetReady request
 	GetReady(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GenerateGreetingWithBody request with any body
+	GenerateGreetingWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	GenerateGreeting(ctx context.Context, body GenerateGreetingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVersion request
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -110,6 +116,30 @@ func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (
 
 func (c *Client) GetReady(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetReadyRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GenerateGreetingWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGenerateGreetingRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GenerateGreeting(ctx context.Context, body GenerateGreetingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGenerateGreetingRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -182,6 +212,46 @@ func NewGetReadyRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGenerateGreetingRequest calls the generic GenerateGreeting builder with application/json body
+func NewGenerateGreetingRequest(server string, body GenerateGreetingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewGenerateGreetingRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewGenerateGreetingRequestWithBody generates requests for GenerateGreeting with any type of body
+func NewGenerateGreetingRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/greetings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -262,6 +332,11 @@ type ClientWithResponsesInterface interface {
 	// GetReadyWithResponse request
 	GetReadyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetReadyResponse, error)
 
+	// GenerateGreetingWithBodyWithResponse request with any body
+	GenerateGreetingWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GenerateGreetingResponse, error)
+
+	GenerateGreetingWithResponse(ctx context.Context, body GenerateGreetingJSONRequestBody, reqEditors ...RequestEditorFn) (*GenerateGreetingResponse, error)
+
 	// GetVersionWithResponse request
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
 }
@@ -339,6 +414,42 @@ func (r GetReadyResponse) ContentType() string {
 	return ""
 }
 
+type GenerateGreetingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Greeting
+	JSON400      *BadRequest
+	JSON403      *Forbidden
+	JSON404      *NotFound
+	JSON405      *MethodNotAllowed
+	JSON413      *ContentTooLarge
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GenerateGreetingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GenerateGreetingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GenerateGreetingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetVersionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -391,6 +502,23 @@ func (c *ClientWithResponses) GetReadyWithResponse(ctx context.Context, reqEdito
 		return nil, err
 	}
 	return ParseGetReadyResponse(rsp)
+}
+
+// GenerateGreetingWithBodyWithResponse request with arbitrary body returning *GenerateGreetingResponse
+func (c *ClientWithResponses) GenerateGreetingWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GenerateGreetingResponse, error) {
+	rsp, err := c.GenerateGreetingWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGenerateGreetingResponse(rsp)
+}
+
+func (c *ClientWithResponses) GenerateGreetingWithResponse(ctx context.Context, body GenerateGreetingJSONRequestBody, reqEditors ...RequestEditorFn) (*GenerateGreetingResponse, error) {
+	rsp, err := c.GenerateGreeting(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGenerateGreetingResponse(rsp)
 }
 
 // GetVersionWithResponse request returning *GetVersionResponse
@@ -539,6 +667,74 @@ func ParseGetReadyResponse(rsp *http.Response) (*GetReadyResponse, error) {
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGenerateGreetingResponse parses an HTTP response from a GenerateGreetingWithResponse call
+func ParseGenerateGreetingResponse(rsp *http.Response) (*GenerateGreetingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GenerateGreetingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Greeting
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest MethodNotAllowed
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ContentTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

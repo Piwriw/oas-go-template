@@ -21,6 +21,9 @@ type ServerInterface interface {
 	// Readiness probe — dependencies (e.g. DB) are reachable.
 	// (GET /readyz)
 	GetReady(c *gin.Context)
+	// Generate a greeting for a name.
+	// (POST /v1/greetings)
+	GenerateGreeting(c *gin.Context)
 	// Build version info
 	// (GET /version)
 	GetVersion(c *gin.Context)
@@ -59,6 +62,19 @@ func (siw *ServerInterfaceWrapper) GetReady(c *gin.Context) {
 	}
 
 	siw.Handler.GetReady(c)
+}
+
+// GenerateGreeting operation middleware
+func (siw *ServerInterfaceWrapper) GenerateGreeting(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GenerateGreeting(c)
 }
 
 // GetVersion operation middleware
@@ -103,6 +119,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 
 	router.GET(options.BaseURL+"/healthz", wrapper.GetHealth)
 	router.GET(options.BaseURL+"/readyz", wrapper.GetReady)
+	router.POST(options.BaseURL+"/v1/greetings", wrapper.GenerateGreeting)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 }
 
@@ -346,6 +363,114 @@ func (response GetReady503JSONResponse) VisitGetReadyResponse(w http.ResponseWri
 	return err
 }
 
+type GenerateGreetingRequestObject struct {
+	Body *GenerateGreetingJSONRequestBody
+}
+
+type GenerateGreetingResponseObject interface {
+	VisitGenerateGreetingResponse(w http.ResponseWriter) error
+}
+
+type GenerateGreeting200JSONResponse Greeting
+
+func (response GenerateGreeting200JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateGreeting400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GenerateGreeting400JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateGreeting403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GenerateGreeting403JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateGreeting404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GenerateGreeting404JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateGreeting405JSONResponse struct{ MethodNotAllowedJSONResponse }
+
+func (response GenerateGreeting405JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateGreeting413JSONResponse struct{ ContentTooLargeJSONResponse }
+
+func (response GenerateGreeting413JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GenerateGreeting500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GenerateGreeting500JSONResponse) VisitGenerateGreetingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVersionRequestObject struct {
 }
 
@@ -461,6 +586,9 @@ type StrictServerInterface interface {
 	// Readiness probe — dependencies (e.g. DB) are reachable.
 	// (GET /readyz)
 	GetReady(ctx context.Context, request GetReadyRequestObject) (GetReadyResponseObject, error)
+	// Generate a greeting for a name.
+	// (POST /v1/greetings)
+	GenerateGreeting(ctx context.Context, request GenerateGreetingRequestObject) (GenerateGreetingResponseObject, error)
 	// Build version info
 	// (GET /version)
 	GetVersion(ctx context.Context, request GetVersionRequestObject) (GetVersionResponseObject, error)
@@ -564,6 +692,37 @@ func (sh *strictHandler) GetReady(ctx *gin.Context) {
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(GetReadyResponseObject); ok {
 		if err := validResponse.VisitGetReadyResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GenerateGreeting operation middleware
+func (sh *strictHandler) GenerateGreeting(ctx *gin.Context) {
+	var request GenerateGreetingRequestObject
+
+	var body GenerateGreetingJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GenerateGreeting(ctx, request.(GenerateGreetingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GenerateGreeting")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GenerateGreetingResponseObject); ok {
+		if err := validResponse.VisitGenerateGreetingResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {
