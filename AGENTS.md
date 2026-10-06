@@ -201,6 +201,7 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **English messages**: all application log messages and response `message` fields must use English, including validation and error messages.
 - **Test behavior, not plumbing**: do not add unit tests that merely re-verify Go standard-library or third-party behavior, or straightforward field-to-option assignments. For configuration switches, cover built-in defaults and explicit YAML overrides at the `config.Load` boundary; add deeper behavior tests only when the project implements custom branching, transformation, or failure handling.
 - **Database code needs no tests**: `internal/db/` and its subpackages (`models/`, `store/`) carry no unit tests — do not add or restore test files there. The package is thin plumbing over gorm and golang-migrate; reachability is covered by `/readyz`, and DB behavior is verified against real environments instead of unit tests.
 - **Function comments**: every named function and method in non-generated Go code, including tests and test helpers, must have exactly one concise comment line immediately above its declaration. Use `// FunctionName ...`, start with the exact function name, and describe the concrete business responsibility rather than restating the signature. Anonymous functions are exempt; never edit `*.gen.go` to add comments.

@@ -145,6 +145,7 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **English messages**: all application log messages and response `message` fields must use English, including validation and error messages.
 - **Test behavior, not plumbing**: do not add unit tests that merely re-verify Go standard-library or third-party behavior, or straightforward field-to-option assignments. For configuration switches, cover built-in defaults and explicit YAML overrides at the `config.Load` boundary; add deeper behavior tests only when the project implements custom branching, transformation, or failure handling.
 - **Database code needs no tests**: `internal/db/` and its subpackages (`models/`, `store/`) carry no unit tests — do not add or restore test files there. The package is thin plumbing over gorm and golang-migrate; reachability is covered by `/readyz`, and DB behavior is verified against real environments instead of unit tests.
 - **Database model field comments**: every field in a non-generated persistent database model must have a concise comment line immediately above the field declaration. The comment must describe the field's business meaning; trailing comments do not satisfy this requirement. Never edit `*.gen.go` to add these comments.
