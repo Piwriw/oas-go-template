@@ -34,7 +34,6 @@ const (
 	migrationTableName     = "schema_migrations"
 	migrationVersionLayout = "20060102150405"
 
-	migrationDriverMySQL    = "mysql"
 	migrationDriverPostgres = "pgx"
 	migrationDriverSQLite   = "sqlite3"
 )
@@ -129,16 +128,16 @@ func applyDirection(migrator *migrate.Migrate, direction MigrationDirection) err
 	return nil
 }
 
-// newMigrationDatabase opens and adapts the configured connection for schema
-// migrations. Supporting another database means adding one case and one function.
+// newMigrationDatabase opens and adapts structured connection settings for schema migrations.
 func newMigrationDatabase(ctx context.Context, gdb *gorm.DB, cfg Config) (migratedatabase.Driver, string, error) {
+	dsn := cfg.connectionString()
 	switch cfg.Driver {
-	case "postgres", "postgresql", "pg":
-		return pgxMigrationDatabase(ctx, cfg.DSN)
-	case "mysql":
-		return mysqlMigrationDatabase(ctx, cfg.DSN)
-	case "sqlite", "sqlite3":
-		return sqliteMigrationDatabase(ctx, gdb, cfg.DSN)
+	case DriverPostgres:
+		return pgxMigrationDatabase(ctx, dsn)
+	case DriverMySQL:
+		return mysqlMigrationDatabase(ctx, dsn)
+	case DriverSQLite:
+		return sqliteMigrationDatabase(ctx, gdb, dsn)
 	default:
 		return nil, "", fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.Driver)
 	}
@@ -159,8 +158,7 @@ func pgxMigrationDatabase(ctx context.Context, dsn string) (migratedatabase.Driv
 	return driver, migrationDriverPostgres, nil
 }
 
-// mysqlMigrationDatabase dials MySQL with multi-statement support enabled so one
-// migration file may hold several statements.
+// mysqlMigrationDatabase enables multi-statement SQL scripts on a dedicated MySQL connection.
 func mysqlMigrationDatabase(ctx context.Context, dsn string) (migratedatabase.Driver, string, error) {
 	mysqlConfig, err := mysqldriver.ParseDSN(dsn)
 	if err != nil {
@@ -168,7 +166,7 @@ func mysqlMigrationDatabase(ctx context.Context, dsn string) (migratedatabase.Dr
 	}
 	mysqlConfig.MultiStatements = true
 
-	sqlDB, err := openMigrationDB(ctx, migrationDriverMySQL, mysqlConfig.FormatDSN())
+	sqlDB, err := openMigrationDB(ctx, DriverMySQL, mysqlConfig.FormatDSN())
 	if err != nil {
 		return nil, "", err
 	}
@@ -178,13 +176,10 @@ func mysqlMigrationDatabase(ctx context.Context, dsn string) (migratedatabase.Dr
 	if err != nil {
 		return nil, "", errors.Join(fmt.Errorf("initialize migration database: %w", err), sqlDB.Close())
 	}
-	return driver, migrationDriverMySQL, nil
+	return driver, DriverMySQL, nil
 }
 
-// sqliteMigrationDatabase reuses the application connection when there is one,
-// because a private connection would not see the same database — and an
-// in-memory DSN would get a second, empty one. Only a standalone migrator dials
-// the DSN itself, and it must not close the application's connection.
+// sqliteMigrationDatabase reuses an application connection or opens the configured database file.
 func sqliteMigrationDatabase(ctx context.Context, gdb *gorm.DB, dsn string) (migratedatabase.Driver, string, error) {
 	if gdb != nil {
 		sqlDB, err := gdb.DB()

@@ -53,7 +53,12 @@ server:
       gin_mode: release
     db:
       driver: ""
-      dsn: ""
+      host: localhost
+      port: 0
+      user: ""
+      password: ""
+      database: ""
+      ssl_mode: prefer
     log:
       format: json
       level: info

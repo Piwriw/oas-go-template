@@ -66,7 +66,7 @@ Collect all of these values before copying or modifying the template:
 - `GITHUB_HOSTED` — whether the project will live on GitHub.com
 
 If `DATABASE_DRIVER` is missing, ask the customer and wait for the answer. Do
-not infer it from a local DSN, default to PostgreSQL, or leave all three drivers
+not infer it from local database configuration, default to PostgreSQL, or leave all three drivers
 in the derived project. The choice specializes the compiled project; an empty
 runtime `db.driver` may still disable the selected database dependency.
 
@@ -110,8 +110,9 @@ Immediately after the rename, specialize the project for `DATABASE_DRIVER`.
 Preserve the optional-database behavior, SQL migration embedding, OTel tracing,
 pool settings, and `schema_migrations`; remove only unselected dialect support.
 
-1. In `internal/db/db.go`, retain the selected Gorm driver import and dialector.
-   Remove the other driver imports, switch branches, aliases, and error text.
+1. In `internal/db/db.go`, retain the selected Gorm driver import, dialector,
+   and `connectionString` branch.
+   Remove the other driver imports, constants, switch branches, and error text.
 2. In `internal/db/migration.go`, retain only the matching `golang-migrate`
    database adapter and SQL driver setup. Simplify the driver switch and remove
    helpers that only serve another dialect. Keep MySQL multi-statements only for
@@ -311,20 +312,28 @@ To disable OTel entirely (e.g. in unit tests or local dev), set `otel.enabled: f
 The source template ships PostgreSQL, MySQL, and SQLite support only so it can
 serve different projects. A derived project must retain exactly the customer's
 selected driver using Step 3. Runtime use remains opt-in: leave `db.driver`
-empty to boot DB-free, or set the selected driver plus `db.dsn` to connect.
+empty to boot DB-free, or configure the selected driver with separate connection
+fields. PostgreSQL/MySQL require `user` and `database`; `host` defaults to
+`localhost` and `port: 0` selects the driver's default port. SQLite requires only
+`database` (a file path or `:memory:`). Raw `db.dsn` configuration is unsupported.
 
 ```yaml
 # config.yaml
 db:
   driver: postgres                              # the one selected driver
-  dsn: "host=localhost user=app password=app dbname=app sslmode=disable"
+  host: localhost
+  port: 5432
+  user: app
+  password: "app"
+  database: app
+  ssl_mode: disable                             # PostgreSQL local development
   max_open_conns: 25
   max_idle_conns: 5
   conn_max_lifetime: 30m
   log_sql: false                                # flip to true to log every SQL statement
 ```
 
-`*gorm.DB` is already wired into `service.New(gdb)`, and the resulting service into `handler.New(svc)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`. They also run on demand through the dedicated `cmd/migrate` entrypoint: `make migrate-up` applies all pending versions and `make migrate-down` rolls back exactly one, using the DSN from `CONFIG`.
+`*gorm.DB` is already wired into `service.New(gdb)`, and the resulting service into `handler.New(svc)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`. They also run on demand through the dedicated `cmd/migrate` entrypoint: `make migrate-up` applies all pending versions and `make migrate-down` rolls back exactly one, using the connection fields from `CONFIG`.
 
 ## Error codes — `internal/errcode`
 
@@ -469,7 +478,7 @@ If `make dev-stack` fails with `registry-1.docker.io` timeouts, configure a Dock
 
 ### 13. SQLite `:memory:` is per-connection
 
-Each connection to `file::memory:` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Fix: use `file::memory:?cache=shared` and set `max_open_conns: 1` plus `max_idle_conns: 1` in the test YAML/config. The template does not include DB unit tests; verify DB behavior in an integration environment.
+Each connection to `database: ":memory:"` gets its own private database. With a connection pool, your migration lands on connection A, the next query runs on connection B which sees an empty DB. Set `max_open_conns: 1` and `max_idle_conns: 1` in the test YAML/config so migrations and queries reuse the same connection. The template does not include DB unit tests; verify DB behavior in an integration environment.
 
 ### 14. Pass `*gorm.DB` via the service constructor
 

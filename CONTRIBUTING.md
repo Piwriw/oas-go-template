@@ -118,7 +118,7 @@ and must match your git identity.
       the PR explains the version/migration strategy for an intentional break
 - [ ] New endpoints have handler implementations, not just generated stubs
 - [ ] Architecture changes update `docs/ARCHITECTURE.md` in the same PR
-- [ ] No secrets, real DSNs, or customer data in commits
+- [ ] No secrets, database passwords, or customer data in commits
 - [ ] If you changed `spec/openapi.yaml`, the regenerated `*.gen.go` and
       `web/src/api/schema.gen.ts` are committed in the same PR
 - [ ] Every commit has a `Signed-off-by:` trailer (see [Sign-off (DCO)](#sign-off-dco))

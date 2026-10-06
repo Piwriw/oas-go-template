@@ -130,6 +130,13 @@ service. A configured driver opens PostgreSQL, MySQL, or SQLite, registers SQL
 tracing, configures the pool, and pings before applying embedded migrations. The
 HTTP listener starts only after dependency initialization succeeds.
 
+Database configuration uses separate `host`, `port`, `user`, `password`, and
+`database` fields. The DB package builds the driver's connection string internally
+for both server startup and manual migrations. PostgreSQL also accepts `ssl_mode`.
+For SQLite, `database` is a file path or `:memory:`; network and credential fields
+are unused. Configuration validation supplies the default network port and checks
+required fields; raw `db.dsn` configuration is no longer supported.
+
 [internal/db/migrations](../internal/db/migrations/) contains timestamped
 `.up.sql` / `.down.sql` pairs executed by `golang-migrate`. Applied versions and
 dirty state live in `schema_migrations`. Applied migrations are immutable; the

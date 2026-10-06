@@ -34,6 +34,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Database configuration now uses separate host, port, user, password, and
+  database fields, with PostgreSQL SSL mode. Server startup and manual migrations
+  build connection strings internally; existing YAML must replace `db.dsn`.
 - CI now uses pinned versions of code generation, lint, security scanning, and
   Helm tooling instead of floating `latest` versions.
 - Helm defaults now disable OTel when no collector is deployed and apply safer

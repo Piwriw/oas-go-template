@@ -87,7 +87,7 @@ handler, response, recovery, 404, and 405 errors all return `api.Error`.
 1. Built-in `defaults()` (HTTPAddr `:8000`, GinMode `debug`, OTel enabled, pool sizes, etc.)
 2. `config.yaml` (path from `-c` flag, default `config.yaml`)
 
-There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + DSN-required-when-driver-set, etc.).
+There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + required database connection fields, etc.).
 
 `config.yaml` is gitignored; commit only `config.example.yaml`.
 
@@ -99,9 +99,14 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 ### DB (Gorm, opt-in)
 
-`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout. Migrations run automatically at startup; `make migrate-up` applies pending migrations manually and `make migrate-down` rolls back exactly one version using the DSN from `CONFIG` (default `config.yaml`).
+`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout. Migrations run automatically at startup; `make migrate-up` applies pending migrations manually and `make migrate-down` rolls back exactly one version using the connection fields from `CONFIG` (default `config.yaml`).
 
 `*gorm.DB` is injected via `service.New(gdb)` and the service via `handler.New(svc)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
+
+Connections use separate `host`, `port`, `user`, `password`, and `database` fields;
+PostgreSQL also accepts `ssl_mode`. SQLite uses `database` as its file path or
+`:memory:`. Connection strings are built internally; raw `db.dsn` configuration
+is unsupported. See [AGENTS.md](AGENTS.md#db-gorm-opt-in) for the shared rules.
 
 ### /healthz vs /readyz
 

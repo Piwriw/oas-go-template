@@ -10,7 +10,12 @@ server:
 
 db:
   driver: ""                 # postgres | mysql | sqlite; empty = disabled
-  dsn: ""                    # required when driver is set
+  host: localhost           # PostgreSQL/MySQL only
+  port: 0                   # 0 = driver default (postgres 5432, mysql 3306)
+  user: ""                  # required for PostgreSQL/MySQL
+  password: ""              # may be empty for passwordless authentication
+  database: ""              # required: database name, SQLite file path, or :memory:
+  ssl_mode: prefer           # PostgreSQL: disable | allow | prefer | require | verify-ca | verify-full
   max_open_conns: 25
   max_idle_conns: 5
   conn_max_lifetime: 30m     # any time.ParseDuration form

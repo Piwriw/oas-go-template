@@ -145,7 +145,7 @@ cp config.example.yaml config.yaml
 ```
 
 `config.yaml` is gitignored — only `config.example.yaml` is tracked. Secrets
-(DSN, OTLP endpoint, etc.) live in your local `config.yaml`, never in git.
+(database passwords, exporter credentials, etc.) live in your local `config.yaml`, never in git.
 
 Missing `config.yaml` is fine — built-in defaults take over so tests and
 scratch runs don't need to author one. Validation (`gin_mode`, `log.format`,
@@ -153,7 +153,7 @@ scratch runs don't need to author one. Validation (`gin_mode`, `log.format`,
 
 On Kubernetes, set Helm's `server.existingConfigSecret.name` to mount a
 Secret containing the complete `config.yaml`. This keeps the YAML-only config
-model while allowing DSNs and exporter credentials to stay out of chart values.
+model while allowing database passwords and exporter credentials to stay out of chart values.
 
 The HTTP server uses fixed safeguards: a 5s read-header timeout, 15s read
 timeout, 30s write timeout, 60s idle timeout, 1 MiB headers, and 1 MiB request
@@ -170,7 +170,12 @@ is not a configured dependency, `/readyz` still reports 200 in that mode.
 # config.yaml
 db:
   driver: postgres                              # postgres | mysql | sqlite; empty = disabled
-  dsn: "host=localhost user=app password=app dbname=app sslmode=disable"
+  host: localhost
+  port: 5432
+  user: app
+  password: "app"
+  database: app
+  ssl_mode: disable                             # PostgreSQL local development
   max_open_conns: 25
   max_idle_conns: 5
   conn_max_lifetime: 30m
@@ -180,16 +185,25 @@ db:
 | yaml | default | notes |
 |------|---------|-------|
 | `db.driver` | empty | `postgres` / `mysql` / `sqlite`; empty = disabled |
-| `db.dsn` | — | required when driver is set |
+| `db.host` | `localhost` | PostgreSQL/MySQL server host |
+| `db.port` | `0` | `0` selects 5432 for PostgreSQL or 3306 for MySQL |
+| `db.user` | empty | required for PostgreSQL/MySQL |
+| `db.password` | empty | may be empty for passwordless authentication |
+| `db.database` | empty | required; SQLite uses a file path or `:memory:` |
+| `db.ssl_mode` | `prefer` | PostgreSQL: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` |
 | `db.max_open_conns` | `25` | |
 | `db.max_idle_conns` | `5` | |
 | `db.conn_max_lifetime` | `30m` | any `time.ParseDuration` form |
 | `db.log_sql` | `false` | `true` routes every SQL statement through gorm's Trace |
 
+Connection strings are built internally from these fields for both the server and
+manual migrations. Existing configurations must replace `db.dsn` with these fields.
+Passwords containing reserved characters are encoded by the URL/MySQL driver
+builders. SQLite ignores host, port, user, password, and SSL mode.
+
 Every SQL operation becomes an OTel span via `gorm.io/plugin/opentelemetry`.
-For SQLite integration tests, use `file::memory:?cache=shared` plus
-`max_open_conns: 1` — without that, each pool connection gets its own
-private memory DB.
+For SQLite integration tests, set `database: ':memory:'`, `max_open_conns: 1`, and
+`max_idle_conns: 1` so migrations and queries reuse the same memory database.
 
 `internal/db.Paginate` provides one-based, bounded pagination with matching
 count metadata. Pass it a query containing the filters and an explicit stable
@@ -226,7 +240,7 @@ make migrate-down                       # roll back exactly one migration
 make migrate-up CONFIG=/etc/app/prod.yaml
 ```
 
-Both targets use the database DSN from `CONFIG` (default `config.yaml`). An empty
+Both targets use the database connection fields from `CONFIG` (default `config.yaml`). An empty
 migration directory is a successful no-op, which keeps a newly initialized
 project usable before its first schema change.
 

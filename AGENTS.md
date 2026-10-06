@@ -126,7 +126,7 @@ operational `/metrics` route remains outside the OAS validator group.
 1. Built-in `defaults()` (HTTPAddr `:8000`, GinMode `debug`, OTel enabled, pool sizes, etc.)
 2. `config.yaml` (path from `-c` flag, default `config.yaml`)
 
-There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + DSN-required-when-driver-set, etc.).
+There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + required database connection fields, etc.).
 
 `config.yaml` is gitignored; commit only `config.example.yaml`.
 
@@ -140,6 +140,12 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 `internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout.
 
+Configure connections with `host`, `port`, `user`, `password`, and `database`;
+PostgreSQL also accepts `ssl_mode`. `config.Load` normalizes driver aliases and
+resolves default ports. PostgreSQL/MySQL require a user and database; SQLite uses
+`database` as its file path or `:memory:`. Driver connection strings are built
+internally and shared by startup and manual migrations; do not restore `db.dsn`.
+
 After the ping, `Init` runs embedded SQL migrations from
 `internal/db/migrations/`. Each change is a
 `YYYYMMDDHHMMSS_name.up.sql` / `.down.sql` pair managed by `golang-migrate`.
@@ -148,7 +154,7 @@ versions are skipped. Never edit or reuse an applied version.
 
 Migrations can also run manually without booting the server: `make migrate-up`
 applies every pending migration and `make migrate-down` rolls back exactly one
-version against the DSN in `CONFIG` (default `config.yaml`). Both targets invoke
+version against the database configured in `CONFIG` (default `config.yaml`). Both targets invoke
 the dedicated `cmd/migrate` entrypoint.
 
 `*gorm.DB` is injected via `service.New(gdb)` and the service via `handler.New(svc)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
