@@ -110,7 +110,7 @@ make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 `spec/*.cfg.yaml` 定义生成模式，`scripts/gen.sh` 集中管理输入输出路径，服务端和客户端模型共用一份配置。
 `goimports` 和 `govulncheck` 仍由根目录的 `go.mod` 固定版本；这些工具均通过 `go tool` 运行，
 首次使用时 Go 会自动下载。CI 校验 `make gen-all` 后 Go 和 TypeScript 产物没有差异，
-运行前端 lint、类型检查和生产构建，并检查两个 Go 模块的依赖是否整理完毕。
+运行前端测试、lint、类型检查和生产构建，并检查两个 Go 模块的依赖是否整理完毕。
 执行本地 lint 前需要安装
 [golangci-lint v2.13.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
 CI 则使用固定到不可变提交的官方 Action。`make tools` 只安装本地开发辅助工具
@@ -252,7 +252,7 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 
 如果漏写了某个 handler 方法，`internal/handler/handler_test.go` 里的编译期断言 `var _ api.StrictServerInterface = (*Handler)(nil)` 会让构建失败，并列出所有缺失的方法。
 
-`POST /v1/greetings` 是可替换的端到端示例：发送 `{"name":"Ada"}` 会得到 `{"message":"Hello, Ada!"}`；空白名字返回统一的 `Error` 响应。前端工作台通过生成的 TypeScript 类型展示运维探针并调用该接口。
+`POST /v1/greetings` 是可替换的端到端示例：发送 `{"name":"Ada"}` 会得到 `{"message":"Hello, Ada!"}`；空白名字返回统一的 `Error` 响应。前端工作台通过生成的 TypeScript 类型展示运维探针并调用该接口，支持英文和简体中文切换，并根据数值 `errcode` 翻译错误提示；详见 [web/README.md](web/README.md#internationalization)。
 
 ## API 契约
 

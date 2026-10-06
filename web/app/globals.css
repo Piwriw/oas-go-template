@@ -28,7 +28,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -42,7 +43,8 @@ button:disabled {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 3px;
 }
@@ -99,6 +101,22 @@ input:focus-visible {
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--surface-soft);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.language-select {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 13px;
 }
 
 .workspace {
@@ -400,6 +418,12 @@ pre {
   color: var(--red);
 }
 
+.response-error-message {
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .response-body {
   min-height: 154px;
   margin: 0;
@@ -435,6 +459,8 @@ pre {
   .topbar {
     min-height: 70px;
     padding: 14px 20px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .brand-context,

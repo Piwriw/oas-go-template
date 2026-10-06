@@ -51,6 +51,7 @@ does not serve frontend assets.
 | [pkg/api](../pkg/api/) | Provide generated public Go models, the client SDK, and the embedded OpenAPI document. |
 | [pkg/httpx](../pkg/httpx/) | Provide reusable outbound HTTP helpers with retries, tracing, and logging. |
 | [web](../web/) | Build the React UI and typed browser client as a static export. |
+| [web/src/i18n](../web/src/i18n/) | Own English/Chinese UI dictionaries, browser language preference, and public error-code translations. |
 | [chart](../chart/) | Deploy separate backend and frontend workloads and services with Helm. |
 
 Services return domain values and errors; handlers own their mapping to HTTP and
@@ -77,6 +78,22 @@ files are committed; edit the spec and run `make gen-all` to update both languag
 [web/src/api/client.ts](../web/src/api/client.ts) is the hand-written runtime
 client built with `openapi-fetch`; TypeScript generation produces types only.
 The embedded spec is consumed by the server, but there is no `/openapi.json` route.
+
+`web/src/i18n` exports one shared browser `i18n` instance. React components use
+`useI18n()` to subscribe through `useSyncExternalStore`; browser utilities import
+the same instance directly. Its `t()` and `error()` methods use the current
+global language without requiring a locale argument. Error-code mapping lives
+in `web/src/i18n/errors.ts`, aligned with `internal/errcode`.
+Backend logs and response `message` fields stay
+English; the workbench preserves raw JSON and shows a separate localized error.
+Unknown codes use a generic localized fallback, while connection failures have a
+distinct message. Frontend tests check coverage against the backend constants.
+UI translation uses typed dictionaries without additional runtime dependencies.
+The root `I18nProvider` restores the preference and updates document metadata.
+English is the initial/default locale; a language selector
+persists English or Simplified Chinese in localStorage and restores it after
+hydration. Stored API results are translated during rendering, so language changes
+do not issue new requests. Localization keeps the static-export deployment model.
 
 Business routes use a `/vN/` prefix. `/healthz`, `/readyz`, and `/version` are the
 unversioned contract exceptions. `internal/oas` validates that policy and deprecated

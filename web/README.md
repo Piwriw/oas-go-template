@@ -16,6 +16,56 @@ The workbench shows `/healthz`, `/readyz`, and `/version`, and submits
 `POST /v1/greetings` through the typed API client. If the backend is down, it
 shows an offline state and lets you retry.
 
+## Internationalization
+
+The workbench supports English (`en`, the default) and Simplified Chinese
+(`zh-CN`). The header's language selector stores the choice in localStorage
+under `oas-go-template.locale`. Static HTML and the first client render use
+English; the saved choice is restored after hydration. Switching languages
+updates the page, document language, metadata, timestamps, and existing errors
+without repeating API requests. If storage is unavailable, switching still works
+for the current session.
+
+Import all public i18n APIs from `src/i18n`. A single `i18n` instance owns the
+current language, UI translation, error translation, and saved preference.
+`I18nProvider` is mounted once in the root layout to restore the preference and
+update document metadata. Components use `useI18n()` to subscribe to language
+changes; browser utilities can use the same `i18n` instance directly:
+
+```tsx
+import { useI18n } from '../src/i18n'
+
+const { t, error, locale, locales, setLocale } = useI18n()
+t('serviceStatus')
+error({ code: 10001 })
+setLocale('zh-CN')
+```
+
+```ts
+import { i18n } from '../src/i18n'
+
+i18n.t('serviceStatus')
+i18n.error({ code: 10001 })
+```
+
+Both translation functions automatically use the current global language.
+Call them during rendering to keep displayed results in sync with language
+changes. React subscriptions use `useSyncExternalStore`;
+`src/i18n/messages.ts` owns typed dictionaries and interpolation. Add each new
+UI key to both dictionaries. This uses React and native browser APIs with no
+extra runtime dependencies or locale routing.
+
+`error(apiError)` translates the numeric `code` in an API error. The mapping follows
+`../internal/errcode/errcode.go`; add translations and a mapping whenever a new
+backend code is introduced. Unknown codes or malformed errors use a localized
+generic fallback; network failures use a separate translated message. Backend
+logs and response `message` fields remain English. The response pane keeps raw
+JSON unchanged and displays a translated explanation above failed responses.
+
+Run `npm test` (Node.js 22+) to check error-code coverage against the Go source,
+fallbacks, shared language state/subscriptions, language selection, and
+interpolation. CI also runs these tests.
+
 ## Build
 
 ```bash

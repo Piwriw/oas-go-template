@@ -8,7 +8,8 @@
     "gen:api": "openapi-typescript ../spec/openapi.yaml -o src/api/schema.gen.ts",
     "lint:oas": "redocly lint ../spec/openapi.yaml --config ../redocly.yaml",
     "lint": "oxlint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --experimental-default-type=module --test src/i18n/*.test.ts"
   },
   "dependencies": {
     "next": "16.1.2",

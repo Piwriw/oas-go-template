@@ -460,7 +460,7 @@ If you reach for `os.Exit(0)` at the end of `main`, gocritic flags `exitAfterDef
 
 ### 10. Generated code must be checked in, not gitignored
 
-`*.gen.go` files are committed to git. Regeneration must leave them unchanged once they match the spec and generator configuration. Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output. CI runs `make gen-all` to check Go and TypeScript outputs for drift, then runs frontend lint, typecheck, and build.
+`*.gen.go` files are committed to git. Regeneration must leave them unchanged once they match the spec and generator configuration. Do **not** add `*.gen.go` to `.gitignore`; reviewers and IDEs need to see the actual code being compiled. The generated frontend schema (`web/src/api/schema.gen.ts`) is committed the same way — the hand-written `web/src/api/client.ts` beside it is an ordinary source file, not generated output. CI runs `make gen-all` to check Go and TypeScript outputs for drift, then runs frontend tests, lint, typecheck, and build.
 
 ### 11. Middleware order: `otelgin` BEFORE `logging`
 
@@ -526,6 +526,15 @@ const { data, error } = await client.GET('/healthz')
 Routes and methods come from the spec, so a typo'd path is a compile error, and `data` / `error` are narrowed per response status. `schema.gen.ts` is committed, like `*.gen.go`. **Never hand-edit it** — edit `spec/openapi.yaml` and re-run `make gen-web`. `client.ts` is yours to edit (base URL, middleware, auth).
 
 `openapi-typescript`'s TypeScript peer is `^5.x`, so `web/` stays on TS 5.x — moving `web/` to TS 6 makes `npm ci` fail with `ERESOLVE`.
+
+The workbench uses `web/src/i18n` for English (default) and Simplified Chinese,
+with the language choice stored in localStorage. Import `useI18n()` from
+`web/src/i18n` in React components: `t(key)` translates UI text and `error(apiError)`
+translates numeric API error codes using the shared current language. Browser
+utilities can import the same global `i18n` instance directly. When adding codes
+in `internal/errcode`, update both dictionaries and the frontend error mapping;
+`npm test --prefix web` checks coverage. Keep backend logs and response `message`
+fields in English; localize only the UI explanation, preserving raw API data.
 
 ## License
 
