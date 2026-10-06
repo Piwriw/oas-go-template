@@ -8,6 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md is for working **inside** the repo.
 
+## Architecture documentation
+
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing or reviewing
+code. Follow the shared [architecture documentation rule](AGENTS.md#architecture-documentation):
+update the document in the same PR when its architecture changes, and flag missing
+updates during review.
+
 ## Commands
 
 | Task | Command |

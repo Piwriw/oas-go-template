@@ -50,6 +50,14 @@ application dependency changes; CI checks both modules.
 - Regenerating again must leave the outputs unchanged. CI checks both Go and
   TypeScript outputs against the committed versions.
 
+## Architecture documentation
+
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing the
+implementation. If a change alters module responsibilities, ports, protocols,
+dependencies, request or startup/shutdown flows, or deployment topology, update
+that document in the same PR. Reviewers should flag changes that leave the
+document outdated. Development rules remain in [AGENTS.md](AGENTS.md).
+
 ## API versioning and deprecation
 
 - Keep `/healthz`, `/readyz`, and `/version` unversioned; they are operational
@@ -109,6 +117,7 @@ and must match your git identity.
 - [ ] `make contract-check BASE_SPEC=/path/to/openapi-base.yaml` passes, or
       the PR explains the version/migration strategy for an intentional break
 - [ ] New endpoints have handler implementations, not just generated stubs
+- [ ] Architecture changes update `docs/ARCHITECTURE.md` in the same PR
 - [ ] No secrets, real DSNs, or customer data in commits
 - [ ] If you changed `spec/openapi.yaml`, the regenerated `*.gen.go` and
       `web/src/api/schema.gen.ts` are committed in the same PR

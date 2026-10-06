@@ -20,6 +20,7 @@ golangci-lint v2 config, and a Next.js + React + TS frontend (deployed separatel
 ## Table of Contents
 
 - [Tech Stack](#tech-stack)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Initialize a New Project from This Template](#initialize-a-new-project-from-this-template)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)

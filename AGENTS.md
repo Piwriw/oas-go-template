@@ -8,6 +8,17 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 For "how to derive a new project from this template" see `SKILL.md`. AGENTS.md is for working **inside** the repo.
 
+## Architecture documentation
+
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing or reviewing
+code. It describes module responsibilities, request flow, dependencies, and
+deployment topology; the rules below cover development inside those boundaries.
+
+If a change alters module responsibilities, ports, protocols, dependencies,
+request or startup/shutdown flows, or deployment topology, update that document
+in the same PR. When reviewing such a change without the corresponding
+documentation update, flag the missing update.
+
 ## Commands
 
 | Task | Command |
