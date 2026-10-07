@@ -58,6 +58,11 @@ Services return domain values and errors; handlers own their mapping to HTTP and
 [internal/errcode](../internal/errcode/). Middleware handles transport failures
 without importing handlers. Persistent models are distinct from generated API
 models. The included greeting operation does not use the database or example store.
+`internal/db/store.TimeStore` provides `GetCurrentTime(ctx)` to query PostgreSQL
+and MySQL with `NOW()`, or SQLite with `CURRENT_TIMESTAMP`. PostgreSQL's `NOW()`
+returns the transaction start time. SQLite's text result is parsed as UTC, while
+PostgreSQL and MySQL use the configured driver's timestamp decoding. Unsupported
+dialects return an error.
 
 ## Contract and code generation
 
