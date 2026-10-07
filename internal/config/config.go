@@ -24,6 +24,13 @@ import (
 	"github.com/piwriw/oas-go-template/internal/otel"
 )
 
+const (
+	defaultPostgresPort    = 5432
+	defaultMySQLPort       = 3306
+	maxDatabasePort        = 65535
+	defaultDatabaseSSLMode = "prefer"
+)
+
 // Config holds all runtime configuration for the server.
 type Config struct {
 	Server ServerConfig      `mapstructure:"server"`
@@ -72,6 +79,8 @@ func defaults() Config {
 			GinMode:  "debug",
 		},
 		DB: db.Config{
+			Host:            "localhost",
+			SSLMode:         defaultDatabaseSSLMode,
 			MaxOpenConns:    25,
 			MaxIdleConns:    5,
 			ConnMaxLifetime: 30 * time.Minute,
@@ -107,15 +116,50 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("invalid log.level %q", cfg.Log.Level)
 	}
 
-	if cfg.DB.Driver != "" {
-		switch strings.ToLower(cfg.DB.Driver) {
-		case "postgres", "postgresql", "pg", "mysql", "sqlite", "sqlite3":
-			if strings.TrimSpace(cfg.DB.DSN) == "" {
-				return fmt.Errorf("db.driver=%q but db.dsn is empty", cfg.DB.Driver)
-			}
-		default:
-			return fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.DB.Driver)
+	return validateDB(&cfg.DB)
+}
+
+// validateDB validates enabled database connection fields and resolves driver-specific defaults.
+func validateDB(cfg *db.Config) error {
+	cfg.Driver = strings.ToLower(cfg.Driver)
+	switch cfg.Driver {
+	case "":
+		return nil
+	case db.DriverPostgres, "postgresql", "pg":
+		cfg.Driver = db.DriverPostgres
+		if cfg.Port == 0 {
+			cfg.Port = defaultPostgresPort
 		}
+		cfg.SSLMode = strings.ToLower(cfg.SSLMode)
+		switch cfg.SSLMode {
+		case "disable", "allow", defaultDatabaseSSLMode, "require", "verify-ca", "verify-full":
+		default:
+			return fmt.Errorf("invalid db.ssl_mode %q", cfg.SSLMode)
+		}
+	case db.DriverMySQL:
+		if cfg.Port == 0 {
+			cfg.Port = defaultMySQLPort
+		}
+	case db.DriverSQLite, "sqlite3":
+		cfg.Driver = db.DriverSQLite
+	default:
+		return fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.Driver)
+	}
+
+	if strings.TrimSpace(cfg.Database) == "" {
+		return fmt.Errorf("db.driver=%q but db.database is empty", cfg.Driver)
+	}
+	if cfg.Driver == db.DriverSQLite {
+		return nil
+	}
+	if strings.TrimSpace(cfg.Host) == "" {
+		return fmt.Errorf("db.driver=%q but db.host is empty", cfg.Driver)
+	}
+	if strings.TrimSpace(cfg.User) == "" {
+		return fmt.Errorf("db.driver=%q but db.user is empty", cfg.Driver)
+	}
+	if cfg.Port < 1 || cfg.Port > maxDatabasePort {
+		return fmt.Errorf("db.port must be between 1 and %d", maxDatabasePort)
 	}
 	return nil
 }

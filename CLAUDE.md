@@ -8,6 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For "how to derive a new project from this template" see `SKILL.md`. CLAUDE.md is for working **inside** the repo.
 
+## Architecture documentation
+
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing or reviewing
+code. Follow the shared [architecture documentation rule](AGENTS.md#architecture-documentation):
+update the document in the same PR when its architecture changes, and flag missing
+updates during review.
+
 ## Commands
 
 | Task | Command |
@@ -80,7 +87,7 @@ handler, response, recovery, 404, and 405 errors all return `api.Error`.
 1. Built-in `defaults()` (HTTPAddr `:8000`, GinMode `debug`, OTel enabled, pool sizes, etc.)
 2. `config.yaml` (path from `-c` flag, default `config.yaml`)
 
-There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + DSN-required-when-driver-set, etc.).
+There is **no env-var overlay** — YAML is the only source. Missing file is OK (defaults take over); any other stat/read error is returned. `validate()` runs after the merge (`gin_mode` whitelist, `log.format`, `db.driver` whitelist + required database connection fields, etc.).
 
 `config.yaml` is gitignored; commit only `config.example.yaml`.
 
@@ -92,9 +99,14 @@ When OTel is disabled, `/metrics` still serves Go runtime + process collectors (
 
 ### DB (Gorm, opt-in)
 
-`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout. Migrations run automatically at startup; `make migrate-up` applies pending migrations manually and `make migrate-down` rolls back exactly one version using the DSN from `CONFIG` (default `config.yaml`).
+`internal/db/db.go:Init` returns `(nil, nil)` when `cfg.DB.Driver` is empty — server boots DB-free. When set, it opens postgres/mysql/sqlite, registers `gorm.io/plugin/opentelemetry` (every SQL op becomes a child span), and pings with a 5s timeout. Migrations run automatically at startup; `make migrate-up` applies pending migrations manually and `make migrate-down` rolls back exactly one version using the connection fields from `CONFIG` (default `config.yaml`).
 
 `*gorm.DB` is injected via `service.New(gdb)` and the service via `handler.New(svc)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
+
+Connections use separate `host`, `port`, `user`, `password`, and `database` fields;
+PostgreSQL also accepts `ssl_mode`. SQLite uses `database` as its file path or
+`:memory:`. Connection strings are built internally; raw `db.dsn` configuration
+is unsupported. See [AGENTS.md](AGENTS.md#db-gorm-opt-in) for the shared rules.
 
 ### /healthz vs /readyz
 
@@ -133,8 +145,10 @@ for optional local live reload.
 
 ## Watch-outs
 
+- **English messages**: all application log messages and response `message` fields must use English, including validation and error messages.
 - **Test behavior, not plumbing**: do not add unit tests that merely re-verify Go standard-library or third-party behavior, or straightforward field-to-option assignments. For configuration switches, cover built-in defaults and explicit YAML overrides at the `config.Load` boundary; add deeper behavior tests only when the project implements custom branching, transformation, or failure handling.
 - **Database code needs no tests**: `internal/db/` and its subpackages (`models/`, `store/`) carry no unit tests — do not add or restore test files there. The package is thin plumbing over gorm and golang-migrate; reachability is covered by `/readyz`, and DB behavior is verified against real environments instead of unit tests.
+- **One table per model file**: each database table's persistent model must live in its own Go file under `internal/db/models/`; do not define models for multiple tables in the same file. Every table model must explicitly implement Gorm's `TableName() string` method in that same file and return the actual database table name; do not rely on Gorm's inferred naming.
 - **Database model field comments**: every field in a non-generated persistent database model must have a concise comment line immediately above the field declaration. The comment must describe the field's business meaning; trailing comments do not satisfy this requirement. Never edit `*.gen.go` to add these comments.
 - **Named constants without over-extraction**: values that are reused or define business/protocol invariants (route paths, context keys, header names, etc.) belong in a named `const` block immediately after the imports. Do not extract one-off SQL fragments, column names, sort expressions, or other local implementation details merely to avoid literals; keep them at the call site and prefer typed library APIs that eliminate repeated strings. Repeated values used across `switch` cases or conditionals still require named constants.
 - **golangci-lint v2 config syntax** (`.golangci.yml`): uses `default: standard` + `enable: [...]`, not v1's flat `enable`. Generated code is excluded via `path: '.*\.gen\.go$'`.

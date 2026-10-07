@@ -14,6 +14,7 @@
 ## 目录
 
 - [技术栈](#技术栈)
+- [架构说明](docs/ARCHITECTURE.md)
 - [从模板初始化新项目](#从模板初始化新项目)
 - [快速开始](#快速开始)
 - [配置](#配置)
@@ -109,7 +110,7 @@ make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 `spec/*.cfg.yaml` 定义生成模式，`scripts/gen.sh` 集中管理输入输出路径，服务端和客户端模型共用一份配置。
 `goimports` 和 `govulncheck` 仍由根目录的 `go.mod` 固定版本；这些工具均通过 `go tool` 运行，
 首次使用时 Go 会自动下载。CI 校验 `make gen-all` 后 Go 和 TypeScript 产物没有差异，
-运行前端 lint、类型检查和生产构建，并检查两个 Go 模块的依赖是否整理完毕。
+运行前端测试、lint、类型检查和生产构建，并检查两个 Go 模块的依赖是否整理完毕。
 执行本地 lint 前需要安装
 [golangci-lint v2.13.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
 CI 则使用固定到不可变提交的官方 Action。`make tools` 只安装本地开发辅助工具
@@ -125,11 +126,11 @@ cp config.example.yaml config.yaml
 ./bin/server -c /etc/app/prod.yaml # 或显式传路径
 ```
 
-`config.yaml` 已加入 `.gitignore`——仓库只追踪 `config.example.yaml`。密钥（DSN、OTLP endpoint 等）放在你本地的 `config.yaml` 里，绝不入库。
+`config.yaml` 已加入 `.gitignore`——仓库只追踪 `config.example.yaml`。密钥（数据库密码、exporter 凭据等）放在你本地的 `config.yaml` 里，绝不入库。
 
 `config.yaml` 缺失也没关系——内置默认值会接管，测试和临时跑跑不用准备配置文件。校验（`gin_mode`、`log.format`、`db.driver` 白名单等）在 YAML 合并到默认值之后执行。
 
-在 Kubernetes 中，可设置 Helm 的 `server.existingConfigSecret.name`，挂载包含完整 `config.yaml` 的 Secret。这样既保持仅 YAML 的配置模型，又能避免 DSN、exporter 凭据等密钥进入 chart values。
+在 Kubernetes 中，可设置 Helm 的 `server.existingConfigSecret.name`，挂载包含完整 `config.yaml` 的 Secret。这样既保持仅 YAML 的配置模型，又能避免数据库密码、exporter 凭据等密钥进入 chart values。
 
 HTTP 服务固定使用 5 秒读请求头超时、15 秒读超时、30 秒写超时和 60 秒空闲超时，限制请求头为 1 MiB、请求体为 1 MiB。收到关闭信号后，服务会关闭监听器，并通过 `http.Server.Shutdown` 给在途请求最多 10 秒完成。
 
@@ -141,7 +142,12 @@ HTTP 服务固定使用 5 秒读请求头超时、15 秒读超时、30 秒写超
 # config.yaml
 db:
   driver: postgres                              # postgres | mysql | sqlite；空 = 禁用
-  dsn: "host=localhost user=app password=app dbname=app sslmode=disable"
+  host: localhost
+  port: 5432
+  user: app
+  password: "app"
+  database: app
+  ssl_mode: disable                             # PostgreSQL 本地开发
   max_open_conns: 25
   max_idle_conns: 5
   conn_max_lifetime: 30m
@@ -151,13 +157,24 @@ db:
 | yaml | 默认值 | 说明 |
 |------|---------|-------|
 | `db.driver` | 空 | `postgres` / `mysql` / `sqlite`；空 = 禁用 |
-| `db.dsn` | — | 启用 driver 时必填 |
+| `db.host` | `localhost` | PostgreSQL/MySQL 服务地址 |
+| `db.port` | `0` | `0` 使用默认端口：PostgreSQL 5432、MySQL 3306 |
+| `db.user` | 空 | PostgreSQL/MySQL 必填 |
+| `db.password` | 空 | 无密码认证时可留空 |
+| `db.database` | 空 | 启用 driver 时必填；SQLite 填文件路径或 `:memory:` |
+| `db.ssl_mode` | `prefer` | PostgreSQL：`disable`、`allow`、`prefer`、`require`、`verify-ca`、`verify-full` |
 | `db.max_open_conns` | `25` | |
 | `db.max_idle_conns` | `5` | |
 | `db.conn_max_lifetime` | `30m` | 任意 `time.ParseDuration` 接受的形式 |
 | `db.log_sql` | `false` | `true` 时把每条 SQL 经 gorm 的 Trace 输出 |
 
-每条 SQL 操作都会通过 `gorm.io/plugin/opentelemetry` 成为 OTel span。SQLite 集成测试可用 `file::memory:?cache=shared` 并设置 `max_open_conns: 1`，否则连接池里每个连接会拿到独立的内存数据库。
+服务启动和手动迁移均在内部使用这些字段构造连接字符串。已有配置需要把
+`db.dsn` 替换为上述字段；密码中的特殊字符由 URL/MySQL 驱动构造器处理。
+SQLite 不使用 host、port、user、password 和 ssl_mode。
+
+每条 SQL 操作都会通过 `gorm.io/plugin/opentelemetry` 成为 OTel span。SQLite
+集成测试设置 `database: ':memory:'`、`max_open_conns: 1` 和 `max_idle_conns: 1`，
+让迁移和查询复用同一个内存数据库。
 
 `internal/db.Paginate` 提供从 1 开始、限制单页大小并返回总数元数据的通用分页。
 调用方传入筛选条件和明确、稳定的排序；单页默认 10 条，最多 10000 条：
@@ -191,7 +208,7 @@ make migrate-down                       # 固定回退一个迁移版本
 make migrate-up CONFIG=/etc/app/prod.yaml
 ```
 
-两个 target 都从 `CONFIG`（默认 `config.yaml`）读取数据库 DSN。迁移目录没有
+两个 target 都从 `CONFIG`（默认 `config.yaml`）读取数据库连接字段。迁移目录没有
 SQL 文件时会成功退出，因此刚初始化、尚未创建第一个表的项目也能直接使用这些命令。
 
 ## 本地可观测性栈
@@ -235,7 +252,7 @@ docker tag docker.1ms.run/otel/opentelemetry-collector-contrib:0.110.0 otel/open
 
 如果漏写了某个 handler 方法，`internal/handler/handler_test.go` 里的编译期断言 `var _ api.StrictServerInterface = (*Handler)(nil)` 会让构建失败，并列出所有缺失的方法。
 
-`POST /v1/greetings` 是可替换的端到端示例：发送 `{"name":"Ada"}` 会得到 `{"message":"Hello, Ada!"}`；空白名字返回统一的 `Error` 响应。前端工作台通过生成的 TypeScript 类型展示运维探针并调用该接口。
+`POST /v1/greetings` 是可替换的端到端示例：发送 `{"name":"Ada"}` 会得到 `{"message":"Hello, Ada!"}`；空白名字返回统一的 `Error` 响应。前端工作台通过生成的 TypeScript 类型展示运维探针并调用该接口，支持英文和简体中文切换，并根据数值 `errcode` 翻译错误提示；详见 [web/README.md](web/README.md#internationalization)。
 
 ## API 契约
 

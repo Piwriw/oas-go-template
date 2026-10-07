@@ -18,8 +18,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
+	"strconv"
 	"time"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -28,14 +32,28 @@ import (
 	gormotel "gorm.io/plugin/opentelemetry/tracing"
 )
 
-const databasePingTimeout = 5 * time.Second
+const (
+	// DriverPostgres selects the PostgreSQL database dialect.
+	DriverPostgres = "postgres"
+	// DriverMySQL selects the MySQL database dialect.
+	DriverMySQL = "mysql"
+	// DriverSQLite selects the SQLite database dialect.
+	DriverSQLite = "sqlite"
+
+	databasePingTimeout = 5 * time.Second
+)
 
 // Config holds database configuration. Loaded from config.yaml by the
 // config package; defaults are filled in by config.Load before this struct
 // reaches db.Init.
 type Config struct {
 	Driver          string        `mapstructure:"driver"`
-	DSN             string        `mapstructure:"dsn"`
+	Host            string        `mapstructure:"host"`
+	Port            int           `mapstructure:"port"`
+	User            string        `mapstructure:"user"`
+	Password        string        `mapstructure:"password"`
+	Database        string        `mapstructure:"database"`
+	SSLMode         string        `mapstructure:"ssl_mode"`
 	MaxOpenConns    int           `mapstructure:"max_open_conns"`
 	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
@@ -54,7 +72,7 @@ func Init(ctx context.Context, cfg Config) (*gorm.DB, error) {
 		return nil, nil
 	}
 
-	dialector, err := dialectorFor(cfg.Driver, cfg.DSN)
+	dialector, err := dialectorFor(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -134,17 +152,45 @@ func Ping(ctx context.Context, gdb *gorm.DB) error {
 	return sqlDB.PingContext(ctx)
 }
 
-// dialectorFor maps a configured database driver and DSN to its Gorm dialector.
-func dialectorFor(driver, dsn string) (gorm.Dialector, error) {
-	switch driver {
-	case "postgres", "postgresql", "pg":
+// connectionString encodes structured connection fields for the configured database driver.
+func (c Config) connectionString() string {
+	switch c.Driver {
+	case DriverPostgres:
+		connection := url.URL{
+			Scheme: DriverPostgres,
+			User:   url.UserPassword(c.User, c.Password),
+			Host:   net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
+			Path:   "/" + c.Database,
+		}
+		query := url.Values{"sslmode": {c.SSLMode}}
+		connection.RawQuery = query.Encode()
+		return connection.String()
+	case DriverMySQL:
+		connection := mysqldriver.NewConfig()
+		connection.User = c.User
+		connection.Passwd = c.Password
+		connection.Net = "tcp"
+		connection.Addr = net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
+		connection.DBName = c.Database
+		connection.ParseTime = true
+		return connection.FormatDSN()
+	default:
+		return c.Database
+	}
+}
+
+// dialectorFor selects the Gorm dialect using structured connection settings.
+func dialectorFor(cfg Config) (gorm.Dialector, error) {
+	dsn := cfg.connectionString()
+	switch cfg.Driver {
+	case DriverPostgres:
 		return postgres.Open(dsn), nil
-	case "mysql":
+	case DriverMySQL:
 		return mysql.Open(dsn), nil
-	case "sqlite", "sqlite3":
+	case DriverSQLite:
 		return sqlite.Open(dsn), nil
 	default:
-		return nil, fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", driver)
+		return nil, fmt.Errorf("unsupported db.driver %q (want postgres|mysql|sqlite)", cfg.Driver)
 	}
 }
 

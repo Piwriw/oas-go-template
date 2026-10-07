@@ -4,25 +4,20 @@ import Image from 'next/image'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 import { apiBaseUrl, client } from '../src/api/client'
+import { useI18n } from '../src/i18n'
 
-type ProbeState = {
-  kind: 'loading' | 'ok' | 'error'
-  value: string
-  detail: string
-}
+type ProbeState =
+  | { kind: 'loading' }
+  | { kind: 'ok'; version?: string; gitCommit?: string; buildTime?: string }
+  | { kind: 'error'; error: unknown; network: boolean }
 
 type ProbeKey = 'health' | 'ready' | 'version'
 
 type GreetingResponse =
-  | { kind: 'idle' | 'sending' }
+  | { kind: 'idle' | 'sending' | 'network-error' }
   | { kind: 'complete'; status: number; body: unknown }
-  | { kind: 'network-error'; message: string }
 
-const loadingProbe: ProbeState = {
-  kind: 'loading',
-  value: 'Checking',
-  detail: 'Waiting for the API',
-}
+const loadingProbe: ProbeState = { kind: 'loading' }
 
 const routes = {
   health: '/healthz',
@@ -31,29 +26,44 @@ const routes = {
   greeting: '/v1/greetings',
 } as const
 
-const probeLabels: { key: ProbeKey; title: string; path: string }[] = [
-  { key: 'health', title: 'Liveness', path: routes.health },
-  { key: 'ready', title: 'Readiness', path: routes.ready },
-  { key: 'version', title: 'Build', path: routes.version },
-]
+const probeKeys: ProbeKey[] = ['health', 'ready', 'version']
 
-function Probe({ title, path, state }: { title: string; path: string; state: ProbeState }) {
+function Probe({ probeKey, state }: { probeKey: ProbeKey; state: ProbeState }) {
+  const { t, error } = useI18n()
+  let value = t('checking')
+  let detail = t('waitingApi')
+  if (state.kind === 'error') {
+    value = t(probeKey === 'ready' ? 'notReady' : 'unavailable')
+    detail = state.network ? t('networkMessage') : error(state.error)
+  } else if (state.kind === 'ok') {
+    if (probeKey === 'health') {
+      value = t('healthy')
+      detail = state.version ? t('versionDetail', { version: state.version }) : t('processResponding')
+    } else if (probeKey === 'ready') {
+      value = t('readyValue')
+      detail = t('dependenciesAvailable')
+    } else {
+      value = state.version ?? ''
+      detail = t('buildDetail', { commit: state.gitCommit?.slice(0, 8) ?? '', time: state.buildTime ?? '' })
+    }
+  }
   return (
     <article className="probe">
       <div className="probe-topline">
-        <span className="probe-title">{title}</span>
-        <code className="probe-path">GET {path}</code>
+        <span className="probe-title">{t(probeKey)}</span>
+        <code className="probe-path">GET {routes[probeKey]}</code>
       </div>
       <div className={`probe-value probe-${state.kind}`}>
         <span className="probe-dot" aria-hidden="true" />
-        <strong>{state.value}</strong>
+        <strong>{value}</strong>
       </div>
-      <p className="probe-detail">{state.detail}</p>
+      <p className="probe-detail">{detail}</p>
     </article>
   )
 }
 
 export default function HomePage() {
+  const { locale, locales, setLocale, t, error } = useI18n()
   const [probes, setProbes] = useState<Record<ProbeKey, ProbeState>>({
     health: loadingProbe,
     ready: loadingProbe,
@@ -79,18 +89,14 @@ export default function HomePage() {
 
     setProbes({
       health: h?.data
-        ? { kind: 'ok', value: 'Healthy', detail: h.data.version ? `Version ${h.data.version}` : 'Process responding' }
-        : { kind: 'error', value: 'Unavailable', detail: h?.error?.message ?? 'Could not reach the API' },
+        ? { kind: 'ok', version: h.data.version }
+        : { kind: 'error', error: h?.error, network: health.status === 'rejected' },
       ready: r?.data
-        ? { kind: 'ok', value: 'Ready', detail: 'Dependencies available' }
-        : { kind: 'error', value: 'Not ready', detail: r?.error?.message ?? 'Could not reach the API' },
+        ? { kind: 'ok' }
+        : { kind: 'error', error: r?.error, network: ready.status === 'rejected' },
       version: v?.data
-        ? {
-            kind: 'ok',
-            value: v.data.version,
-            detail: `Commit ${v.data.gitCommit.slice(0, 8)} · Built ${v.data.buildTime}`,
-          }
-        : { kind: 'error', value: 'Unavailable', detail: v?.error?.message ?? 'Could not reach the API' },
+        ? { kind: 'ok', ...v.data }
+        : { kind: 'error', error: v?.error, network: version.status === 'rejected' },
     })
     setCheckedAt(new Date())
     setRefreshing(false)
@@ -109,10 +115,10 @@ export default function HomePage() {
       setGreeting({
         kind: 'complete',
         status: response.status,
-        body: data ?? error ?? { message: 'Unexpected empty response' },
+        body: data ?? error ?? null,
       })
     } catch {
-      setGreeting({ kind: 'network-error', message: 'Could not reach the API' })
+      setGreeting({ kind: 'network-error' })
     }
   }
 
@@ -123,36 +129,50 @@ export default function HomePage() {
           <Image src="/favicon.svg" alt="" width={36} height={36} priority />
           <span className="brand-name">oas-go-template</span>
           <span className="brand-divider" aria-hidden="true" />
-          <span className="brand-context">API Workbench</span>
+          <span className="brand-context">{t('workbench')}</span>
         </div>
-        <span className="topbar-label">Service console</span>
+        <div className="topbar-actions">
+          <span className="topbar-label">{t('console')}</span>
+          <select
+            className="language-select"
+            aria-label={t('language')}
+            value={locale}
+            onChange={(event) => setLocale(event.target.value)}
+          >
+            {locales.map((language) => (
+              <option key={language} value={language} lang={language}>
+                {language === 'en' ? 'English' : '简体中文'}
+              </option>
+            ))}
+          </select>
+        </div>
       </header>
 
       <main className="workspace">
         <section className="status-section" aria-labelledby="status-title">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Service</p>
-              <h1 id="status-title">Service status</h1>
+              <p className="eyebrow">{t('service')}</p>
+              <h1 id="status-title">{t('serviceStatus')}</h1>
             </div>
             <div className="section-actions">
               <span className="checked-at">
-                {checkedAt ? `Updated ${checkedAt.toLocaleTimeString('en-US')}` : 'Checking service'}
+                {checkedAt ? t('updated', { time: checkedAt.toLocaleTimeString(locale) }) : t('checkingService')}
               </span>
               <button className="secondary-button" type="button" onClick={() => void refresh()} disabled={refreshing}>
-                Refresh
+                {t('refresh')}
               </button>
             </div>
           </div>
 
           <div className="base-url">
-            <span>API base URL</span>
+            <span>{t('baseUrl')}</span>
             <code>{apiBaseUrl}</code>
           </div>
 
           <div className="probe-grid" aria-live="polite">
-            {probeLabels.map(({ key, title, path }) => (
-              <Probe key={key} title={title} path={path} state={probes[key]} />
+            {probeKeys.map((key) => (
+              <Probe key={key} probeKey={key} state={probes[key]} />
             ))}
           </div>
         </section>
@@ -160,16 +180,16 @@ export default function HomePage() {
         <section className="example-section" aria-labelledby="example-title">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Example API</p>
-              <h2 id="example-title">Generate a greeting</h2>
+              <p className="eyebrow">{t('exampleApi')}</p>
+              <h2 id="example-title">{t('generateGreeting')}</h2>
             </div>
             <div className="route-label"><span>POST</span><code>{routes.greeting}</code></div>
           </div>
 
           <div className="request-tool">
             <form className="request-form" onSubmit={(event) => void sendGreeting(event)}>
-              <div className="pane-heading">Request body</div>
-              <label htmlFor="greeting-name">Name</label>
+              <div className="pane-heading">{t('requestBody')}</div>
+              <label htmlFor="greeting-name">{t('name')}</label>
               <input
                 id="greeting-name"
                 name="name"
@@ -182,25 +202,30 @@ export default function HomePage() {
                 disabled={greeting.kind === 'sending'}
               />
               <button className="primary-button" type="submit" disabled={greeting.kind === 'sending'}>
-                {greeting.kind === 'sending' ? 'Sending...' : 'Send request'}
+                {greeting.kind === 'sending' ? t('sending') : t('sendRequest')}
               </button>
             </form>
 
             <div className="response-pane" aria-live="polite">
               <div className="pane-heading">
-                <span>Response</span>
+                <span>{t('response')}</span>
                 {greeting.kind === 'complete' && (
                   <span className={`response-status ${greeting.status < 400 ? 'response-ok' : 'response-error'}`}>
                     HTTP {greeting.status}
                   </span>
                 )}
-                {greeting.kind === 'network-error' && <span className="response-status response-error">Network error</span>}
+                {greeting.kind === 'network-error' && <span className="response-status response-error">{t('networkError')}</span>}
               </div>
+              {greeting.kind === 'complete' && greeting.status >= 400 && (
+                <p className="response-error-message" role="alert">
+                  {error(greeting.body)}
+                </p>
+              )}
               <pre className={`response-body ${greeting.kind === 'idle' ? 'response-empty' : ''}`}>
-                {greeting.kind === 'idle' && 'No response yet'}
-                {greeting.kind === 'sending' && 'Waiting for response...'}
-                {greeting.kind === 'complete' && JSON.stringify(greeting.body, null, 2)}
-                {greeting.kind === 'network-error' && greeting.message}
+                {greeting.kind === 'idle' && t('noResponse')}
+                {greeting.kind === 'sending' && t('waitingResponse')}
+                {greeting.kind === 'complete' && (greeting.body === null ? t('emptyResponse') : JSON.stringify(greeting.body, null, 2))}
+                {greeting.kind === 'network-error' && t('networkMessage')}
               </pre>
             </div>
           </div>

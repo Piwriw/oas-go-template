@@ -15,6 +15,7 @@
 - [ ] `make lint test audit` passes
 - [ ] `make gen` produces no diff (idempotent codegen)
 - [ ] Spec changes regenerate `*.gen.go` in the same PR
+- [ ] Architecture changes update `docs/ARCHITECTURE.md` in the same PR
 
 ## Risk / rollback
 

@@ -26,6 +26,7 @@
 
 ### 变更
 
+- 数据库配置改用独立的 host、port、user、password、database 字段，并支持 PostgreSQL ssl_mode。服务启动和手动迁移在内部构造连接字符串；已有 YAML 需替换 `db.dsn`。
 - CI 改为使用固定版本的代码生成、lint、安全扫描和 Helm 工具，不再依赖浮动的 `latest` 版本。
 - Helm 默认在没有 collector 时关闭 OTel，并启用更安全的 non-root Pod 安全默认值。
 - 结构化错误日志：内部错误详情和 panic 堆栈只记录在日志中，不返回给外部调用方。
