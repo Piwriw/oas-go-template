@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/oapi-codegen/gin-middleware v1.0.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/viper v1.21.0
