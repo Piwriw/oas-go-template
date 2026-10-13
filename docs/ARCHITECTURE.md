@@ -121,6 +121,13 @@ HTTP listener
 ```
 
 OTel runs before logging so log records can carry the active trace and span IDs.
+Access logs include supplied query parameters (preserving repeated values), route
+path parameters, and the raw request body consumed by validation or handlers.
+Body capture retains at most the first 8 KiB and adds `request_body_truncated`
+when more bytes are read. It does not pre-read or drain the body, so body limits,
+read errors, and handler binding still apply; rejected requests whose bodies are
+never read have no `request_body` field. Parameter values are logged as supplied,
+without automatic redaction.
 CORS allows every origin without credentials. HTTP timeouts and request header/body
 limits are code-owned constants in `cmd/server/main.go`.
 

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -85,7 +87,6 @@ func TestHealthEndpointPassesOASValidation(t *testing.T) {
 
 // TestGreetingEndpoint verifies generated binding, contract validation, and service error mapping over HTTP.
 func TestGreetingEndpoint(t *testing.T) {
-	srv := newHTTPServer(testConfig(), nil)
 	cases := []struct {
 		name        string
 		body        string
@@ -99,6 +100,11 @@ func TestGreetingEndpoint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&output, nil)))
+			t.Cleanup(func() { slog.SetDefault(previous) })
+			srv := newHTTPServer(testConfig(), nil)
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPost, "/v1/greetings", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -115,6 +121,17 @@ func TestGreetingEndpoint(t *testing.T) {
 			}
 			if body.Message != tc.wantMessage || body.Code != tc.wantCode {
 				t.Errorf("response = %+v, want message %q and code %d", body, tc.wantMessage, tc.wantCode)
+			}
+			lines := bytes.Split(bytes.TrimSpace(output.Bytes()), []byte("\n"))
+			var accessLog struct {
+				Message string `json:"msg"`
+				Body    string `json:"request_body"`
+			}
+			if err := json.Unmarshal(lines[len(lines)-1], &accessLog); err != nil {
+				t.Fatalf("decode access log: %v", err)
+			}
+			if accessLog.Message != "http request" || accessLog.Body != tc.body {
+				t.Errorf("access log=%+v, want request_body=%q", accessLog, tc.body)
 			}
 		})
 	}

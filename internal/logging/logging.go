@@ -16,6 +16,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,11 +29,12 @@ import (
 )
 
 const (
-	healthPath   = "/healthz"
-	readyPath    = "/readyz"
-	metricsPath  = "/metrics"
-	loggerKey    = "slog.logger"
-	requestIDKey = "request_id"
+	healthPath         = "/healthz"
+	readyPath          = "/readyz"
+	metricsPath        = "/metrics"
+	loggerKey          = "slog.logger"
+	requestIDKey       = "request_id"
+	maxLoggedBodyBytes = 8 << 10
 )
 
 // LogConfig drives slog setup. Loaded by internal/config.
@@ -76,6 +78,11 @@ func Middleware() gin.HandlerFunc {
 		logger := base.With(slog.String("request_id", reqID))
 		c.Set(loggerKey, logger)
 
+		body := &requestBody{ReadCloser: c.Request.Body}
+		if c.Request.Body != nil {
+			c.Request.Body = body
+		}
+
 		c.Next()
 
 		status := c.Writer.Status()
@@ -83,14 +90,49 @@ func Middleware() gin.HandlerFunc {
 			return
 		}
 
-		logger.LogAttrs(c.Request.Context(), accessLogLevel(status), "http request",
+		attrs := []slog.Attr{
 			slog.String("method", c.Request.Method),
 			slog.String("path", c.Request.URL.Path),
 			slog.Int("status", status),
 			slog.Int("bytes", c.Writer.Size()),
 			slog.Duration("latency", time.Since(start)),
-		)
+		}
+		if query := c.Request.URL.Query(); len(query) > 0 {
+			attrs = append(attrs, slog.Any("query", query))
+		}
+		if len(c.Params) > 0 {
+			params := make(map[string]string, len(c.Params))
+			for _, param := range c.Params {
+				params[param.Key] = param.Value
+			}
+			attrs = append(attrs, slog.Any("path_params", params))
+		}
+		if len(body.data) > 0 {
+			attrs = append(attrs, slog.String("request_body", string(body.data)))
+		}
+		if body.truncated {
+			attrs = append(attrs, slog.Bool("request_body_truncated", true))
+		}
+		logger.LogAttrs(c.Request.Context(), accessLogLevel(status), "http request", attrs...)
 	}
+}
+
+// requestBody captures a bounded copy of the body as downstream middleware and handlers read it.
+type requestBody struct {
+	io.ReadCloser
+	data      []byte
+	truncated bool
+}
+
+// Read preserves request reads and errors while retaining a bounded prefix for access logs.
+func (b *requestBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	remaining := maxLoggedBodyBytes - len(b.data)
+	b.data = append(b.data, p[:min(n, remaining)]...)
+	if n > remaining {
+		b.truncated = true
+	}
+	return n, err
 }
 
 // skipAccessLog suppresses repeated successful logs for high-frequency operational endpoints.
