@@ -159,6 +159,57 @@ the dedicated `cmd/migrate` entrypoint.
 
 `*gorm.DB` is injected via `service.New(gdb)` and the service via `handler.New(svc)`; **`db` may be nil** when the dependency is intentionally disabled, and `/readyz` reports 200 in that case. Use the same pattern for any new optional dependency.
 
+### Database query options
+
+- Use a dedicated, value-passed `<QueryName>Options` struct for queries that
+  combine several filters, pagination, sorting, or a cursor. Keep the type beside
+  its query in the relevant business store file. Simple lookups such as
+  `GetByID(ctx, id)` stay positional; a list with only pagination can keep the
+  existing `db.Pagination`, as `ExampleStore.List` does.
+- Keep `context.Context` first and required caller identity and resource IDs
+  explicit, separate from options. Define fields for the query's actual inputs;
+  reuse existing typed filters where useful instead of adding a universal
+  options struct, raw SQL expressions, or functional `With...` options.
+- Use pointers only when omission differs from the zero value. Name date bounds
+  explicitly and document whether each is inclusive or exclusive; do not use
+  positional `...*time.Time` arguments for a date range.
+- Services authorize requests, normalize pagination, and validate filters and
+  date ranges before calling the store. Service and store options may share a
+  type or alias when their inputs have identical meaning. If persistence needs
+  a database-time snapshot or derived visibility, have the service supply it
+  through separate store options; caller-facing service options must not grant
+  that authority. Keep these types independent of generated API packages.
+- When replacing positional parameters, update callers and existing behavior
+  checks together. Preserve permission filters, date boundaries, stable ordering,
+  totals, and error handling. Follow the database testing policy below; do not
+  add tests that only check field assignments.
+
+For example, a future account search can use these store options:
+
+```go
+// ListUsersOptions filters accounts by literal search, registration bounds and pagination.
+type ListUsersOptions struct {
+    Keyword          string
+    Page             int
+    PageSize         int
+    RegisteredFrom   *time.Time // Inclusive; nil means no lower bound.
+    RegisteredBefore *time.Time // Exclusive; nil means no upper bound.
+}
+```
+
+The query takes `ctx`, the required viewer identity, and `opts ListUsersOptions`.
+Its service caller supplies named fields:
+
+```go
+users, total, err := persistence.ListUsers(ctx, viewerID, store.ListUsersOptions{
+    Keyword:          "Alice",
+    Page:             1,
+    PageSize:         20,
+    RegisteredFrom:   &start,
+    RegisteredBefore: &end,
+})
+```
+
 ### /healthz vs /readyz
 
 Two separate probes — `internal/service/health.go` owns the readiness rule, `internal/handler/health.go` maps it to HTTP:

@@ -335,6 +335,11 @@ db:
 
 `*gorm.DB` is already wired into `service.New(gdb)`, and the resulting service into `handler.New(svc)`. A nil DB means the dependency is intentionally disabled, so `/readyz` reports 200; when DB is configured, handle or ping failures report 503. Timestamped SQL migration pairs live in `internal/db/migrations/` and run at startup through `golang-migrate`. They also run on demand through the dedicated `cmd/migrate` entrypoint: `make migrate-up` applies all pending versions and `make migrate-down` rolls back exactly one, using the connection fields from `CONFIG`.
 
+When adding business queries, follow [Database query options](AGENTS.md#database-query-options):
+group complex query inputs in a dedicated options value, keep required identity
+explicit, and let services own validation and derived authority. Simple lookups
+and lists that already take only `db.Pagination` need no additional wrapper.
+
 ## Error codes — `internal/errcode`
 
 `api.Error.Code` is a stable int32 identifier that clients branch on. The OAS schema documents the range allocation; the canonical list lives in `internal/errcode/errcode.go`:
