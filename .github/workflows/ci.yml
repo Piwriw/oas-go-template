@@ -57,11 +57,12 @@ jobs:
   verify:
     name: Lint, test, audit
     runs-on: ubuntu-latest
-    env:
+    # Anchored so the self-hosted mirror below runs the identical step list.
+    env: &verify-env
       HELM_VERSION: v3.16.2
       OASDIFF_VERSION: v1.10.28
       GOTOOLCHAIN: local
-    steps:
+    steps: &verify-steps
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
@@ -142,6 +143,14 @@ jobs:
       - name: Build server
         run: make build
 
+  verify-self-hosted:
+    name: Lint, test, audit (self-hosted)
+    runs-on: ucloud-controller-ci
+    # Same step list as `verify`; keep tooling assumptions identical so the
+    # self-hosted runner fails for real reasons only, not missing dependencies.
+    env: *verify-env
+    steps: *verify-steps
+
   docker:
     name: Docker build smoke
     runs-on: ubuntu-latest
@@ -159,6 +168,78 @@ jobs:
           push: false
           load: true
           tags: oas-go-template:ci
+          build-args: |
+            VERSION=ci
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+
+  docker-self-hosted:
+    name: Docker build smoke (self-hosted)
+    runs-on: ucloud-controller-ci
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Ensure Docker daemon is running
+        run: |
+          if docker info >/dev/null 2>&1; then
+            echo "Docker daemon is already reachable."
+            exit 0
+          fi
+
+          if [ "$(id -u)" -eq 0 ]; then
+            SUDO=""
+          elif sudo -n true 2>/dev/null; then
+            SUDO="sudo -n"
+          else
+            echo "::error::Docker is not reachable and this runner has no passwordless sudo to start it. Install and start Docker on the runner."
+            exit 1
+          fi
+
+          if [ -n "$SUDO" ] && ! $SUDO sh -c 'command -v dockerd >/dev/null 2>&1'; then
+            echo "::error::dockerd is not installed on this runner. Install Docker (packages or daemon) before running this job."
+            exit 1
+          fi
+
+          if command -v systemctl >/dev/null 2>&1; then
+            $SUDO systemctl enable --now docker 2>/dev/null || $SUDO systemctl start docker 2>/dev/null || true
+          fi
+          if ! $SUDO docker info >/dev/null 2>&1; then
+            echo "No usable systemd unit; launching dockerd directly."
+            $SUDO sh -c 'nohup dockerd >/tmp/dockerd.log 2>&1 &' || true
+          fi
+          for _ in $(seq 1 30); do
+            $SUDO docker info >/dev/null 2>&1 && break
+            sleep 1
+          done
+          if ! $SUDO docker info >/dev/null 2>&1; then
+            echo "::error::Docker daemon failed to start. Recent logs:"
+            $SUDO tail -n 50 /tmp/dockerd.log 2>/dev/null || true
+            $SUDO journalctl -u docker --no-pager -n 50 2>/dev/null || true
+            exit 1
+          fi
+
+          if [ -n "$SUDO" ] && ! docker info >/dev/null 2>&1; then
+            # The runner process predates any docker-group change, so grant the
+            # current user socket access for this run (and persist the group).
+            $SUDO usermod -aG docker "$(id -un)" || true
+            if command -v setfacl >/dev/null 2>&1; then
+              $SUDO setfacl -m "u:$(id -un):rw" /var/run/docker.sock
+            else
+              $SUDO chmod 666 /var/run/docker.sock
+            fi
+          fi
+          docker info
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build server image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: build/Dockerfile
+          push: false
+          load: true
+          tags: oas-go-template:ci-selfhosted
           build-args: |
             VERSION=ci
             GIT_COMMIT=${{ github.sha }}
