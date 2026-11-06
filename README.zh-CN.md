@@ -112,7 +112,7 @@ make docker    # 构建服务端镜像（在 GFW 后请传 GOPROXY=...）
 首次使用时 Go 会自动下载。CI 校验 `make gen-all` 后 Go 和 TypeScript 产物没有差异，
 运行前端测试、lint、类型检查和生产构建，并检查两个 Go 模块的依赖是否整理完毕。
 执行本地 lint 前需要安装
-[golangci-lint v2.13.2 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
+[golangci-lint v2.15.0 官方二进制](https://golangci-lint.run/docs/welcome/install/local/)，
 CI 则使用固定到不可变提交的官方 Action。`make tools` 只安装本地开发辅助工具
 `air` 的固定版本。
 
